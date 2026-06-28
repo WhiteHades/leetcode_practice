@@ -7,22 +7,30 @@ test, submit, and come back later without rebuilding the layout by hand.
 
 ```text
 +-------------+---------------------------+
-|  LEFT 35%   |  TOP-RIGHT 65%            |
-|  leetcode   |  nvim                     |
-|  TUI        |  solution editor          |
+| LEFT        | TOP-RIGHT                 |
+| leetcode    | nvim                      |
+| TUI         | solution editor           |
 |             +---------------------------+
-|             |  BOTTOM-RIGHT             |
-|             |  shell for test/submit    |
+|             | BOTTOM-RIGHT              |
+|             | test/submit shell         |
 +-------------+---------------------------+
 ```
 
 ## Quick Start
 
+Use placeholders for your machine:
+
+- `<repo-dir>`: where this repo is cloned
+- `<leetcode-cli-dir>`: where the LeetCode CLI fork is cloned
+- `<tmux-prefix>`: your tmux prefix, usually `C-b` unless changed
+
 First-time setup:
 
 ```bash
-cd ~/Codes/dsa-ml-practice
-make setup
+git clone https://github.com/WhiteHades/dsa-ml-practice.git <repo-dir>
+git clone https://github.com/WhiteHades/leetcode-cli.git <leetcode-cli-dir>
+cd <repo-dir>
+make LEETCODE_CLI_SRC=<leetcode-cli-dir> setup
 make login
 make tmux
 ```
@@ -30,43 +38,97 @@ make tmux
 Daily use after setup:
 
 ```bash
-cd ~/Codes/dsa-ml-practice
+cd <repo-dir>
 make tmux
 ```
 
-`make tmux` is the recommended entry point. It creates or repairs the
-`dsa-ml-practice` tmux session, then attaches to it. If you run it from
-inside another tmux session, it switches clients instead of nesting tmux.
+`make setup` builds and links the LeetCode CLI fork from
+`LEETCODE_CLI_SRC`; it does not download that CLI by itself. The default
+value is `../leetcode-cli`, so a sibling checkout works without passing
+the variable.
+
+Note: the committed helper scripts and tmux bindings are currently wired
+for the maintainer defaults listed below. Public placeholders show what
+to replace if you adapt this repo for another machine.
 
 ## Daily Workflow
 
 1. Use the left pane to browse LeetCode problems.
-2. Press `p` on a problem to pick it.
+2. Press `p` in the LeetCode TUI to pick a problem.
 3. The solution file opens automatically in the top-right Neovim pane.
 4. Write your solution and save it.
-5. Press `C-a T` to run tests in the bottom-right pane.
-6. Press `C-a S` to submit the current solution.
-7. Press `C-a d` to detach when you are done.
+5. Press `<tmux-prefix> T` to run tests in the bottom-right pane.
+6. Press `<tmux-prefix> S` to submit the current solution.
+7. Press `<tmux-prefix> d` to detach when you are done.
 8. Run `make tmux` later to resume.
 
 ## Key Bindings
 
-These are the important tmux bindings for this workflow:
+The LeetCode-specific bindings are tmux bindings, not Neovim bindings.
+Use your own tmux prefix in place of `<tmux-prefix>`.
 
 | binding | action |
 | --- | --- |
-| `C-a T` | test the current solution file |
-| `C-a S` | submit the current solution file |
-| `C-a c` | create a new tmux window with the same 3-pane layout |
-| `C-a n` / `C-a p` | move to next / previous tmux window |
-| `C-a w` | choose a tmux window from a list |
-| `C-a d` | detach from tmux |
-| `C-a C-s` | manually save tmux session state |
-| `C-a r` | reload tmux config |
+| `<tmux-prefix> T` | test the current solution file |
+| `<tmux-prefix> S` | submit the current solution file |
+| `<tmux-prefix> c` | create a new tmux window |
+| `<tmux-prefix> n` / `<tmux-prefix> p` | move to next / previous tmux window |
+| `<tmux-prefix> w` | choose a tmux window from a list |
+| `<tmux-prefix> d` | detach from tmux |
 
-`C-a T` and `C-a S` are guarded so they only act inside the
-`dsa-ml-practice` tmux session. They should not send LeetCode commands
-into unrelated tmux sessions.
+The test/submit bindings must be added to your tmux config. This repo
+includes helper scripts for them under `scripts/`. See the full guide for
+the generic binding shape and the maintainer-specific tmux config path.
+
+## Maintainer Defaults
+
+This repo is currently tuned for the maintainer's local setup:
+
+| setting | maintainer value |
+| --- | --- |
+| repo path | `~/Codes/dsa-ml-practice` |
+| LeetCode CLI path | `~/Codes/leetcode-cli` |
+| solution workdir | `~/Codes/dsa-ml-practice/leetcode` |
+| tmux session | `dsa-ml-practice` |
+| tmux prefix | `C-a` |
+| dotfiles source | `~/dotfiles` |
+
+So in the maintainer setup, the daily commands are:
+
+```bash
+cd ~/Codes/dsa-ml-practice
+make tmux
+```
+
+and the main bindings are `C-a T` for test and `C-a S` for submit.
+
+## tmux Plugins
+
+The core 3-pane workflow needs tmux and the helper scripts. Automatic
+restore after reboot needs extra tmux plugins.
+
+Recommended plugin path:
+
+1. Install TPM: <https://github.com/tmux-plugins/tpm>
+2. Add plugins such as:
+   - `tmux-plugins/tmux-resurrect`
+   - `tmux-plugins/tmux-continuum`
+3. Reload tmux config.
+4. Use TPM's install binding, usually `<tmux-prefix> I`.
+
+Without `tmux-resurrect` / `tmux-continuum`, tmux windows can still be
+detached and reattached while the tmux server is alive, but they will not
+be automatically restored after reboot.
+
+## Full Guide
+
+Read the detailed workflow guide here:
+
+- [docs/workflow-compendium.md](docs/workflow-compendium.md)
+
+It covers repeated attempts, next-day sessions, multiple windows, tmux
+session safety, troubleshooting, generated files, snapshots, plugin
+expectations, and the maintainer-specific setup.
 
 ## Common Questions
 
@@ -83,30 +145,14 @@ attempts kept for reference.
 
 **Can I solve multiple problems at the same time?**
 
-Yes. Press `C-a c` to create another tmux window. Each window gets its
-own left TUI pane, Neovim pane, and test/submit shell pane.
-
-**Are those windows saved after shutdown?**
-
-tmux-continuum and tmux-resurrect are enabled in the dotfiles. For best
-results, press `C-a C-s` before shutdown, then run `make tmux` after
-booting again.
+Yes. Press `<tmux-prefix> c` to create another tmux window. Each window
+gets its own left TUI pane, Neovim pane, and test/submit shell pane.
 
 **Can I attach without `make tmux`?**
 
 Yes, but it is not the recommended path. `tmux attach -t dsa-ml-practice`
 can attach to an existing session, but it skips the repair step. Use
 `make tmux` when you want the plug-and-play behavior.
-
-## Full Guide
-
-Read the detailed workflow guide here:
-
-- [docs/workflow-compendium.md](docs/workflow-compendium.md)
-
-It covers repeated attempts, next-day sessions, multiple windows, tmux
-session safety, troubleshooting, generated files, snapshots, and the
-recommended habits for this repo.
 
 ## Make Targets
 
@@ -124,16 +170,6 @@ make clean     clear local cache directories
 make repl      launch ipython
 ```
 
-## What Lives Where
-
-- Repo code and workflow scripts live here:
-  `~/Codes/dsa-ml-practice`
-- Generated LeetCode solutions live under:
-  `~/Codes/dsa-ml-practice/leetcode`
-- Generated solutions are git-ignored.
-- tmux and Neovim configuration live in:
-  `~/dotfiles`
-
 ## Requirements
 
 - tmux
@@ -141,6 +177,7 @@ make repl      launch ipython
 - Node/npm for the LeetCode CLI fork
 - `inotifywait`
 - `uv` for Python environment management
+- optional: TPM, `tmux-resurrect`, and `tmux-continuum` for restore
 
-The LeetCode CLI used by this workflow is expected at
-`~/Codes/leetcode-cli`.
+Generated LeetCode solutions are git-ignored and live under the
+configured LeetCode workspace directory.
