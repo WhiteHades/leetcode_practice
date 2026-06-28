@@ -39,7 +39,7 @@ extract_id() {
   basename "$1" | sed -E 's/^([0-9]+)\..*/\1/'
 }
 
-inotifywait -m "$WORKDIR" -e create -e moved_to --format '%w%f' | \
+inotifywait -m -r "$WORKDIR" -e create -e moved_to --format '%w%f' | \
   while read -r path; do
     case "$path" in
       *.py)
