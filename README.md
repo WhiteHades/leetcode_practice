@@ -95,27 +95,46 @@ Open `make tmux` from any directory; it is the single entry point.
 - `C-a d` — detach.
 - `C-a r` — reload `~/.tmux.conf` (unchanged from your dotfiles).
 
+If `C-a T` or `C-a S` does nothing, press `C-a r` to reload the tmux
+config (the keybinds are loaded into the running server, not just
+into new sessions).
+
 ## How Multiple Approaches to the Same Problem Work
 
-The leetcode-cli writes solution files at:
+The night-slayer TUI's `p` (pick) action has been configured so that
+re-picking an already-picked problem preserves your previous attempt
+and creates a fresh template for a new method.
 
-```text
-<workdir>/<Difficulty>/<FirstTopic>/<id>.<slug>.<ext>
-```
+When you press `p` on a problem whose solution file already exists:
 
-For example:
+1. The CLI finds the next available variant number (`1`, `2`, `3`, ...).
+2. The existing file is renamed to `<id>.<slug>.<N>.<ext>` (e.g.
+   `1.two-sum.1.py`).
+3. A fresh template is written to the original path
+   (`<id>.<slug>.<ext>`).
+4. The inotifywait watcher detects the new template, writes the
+   problem id to the sentinel, and sends `:edit <path>` to the nvim
+   pane, opening the fresh template.
+5. The TUI status drawer shows the rename: e.g.
+   `Saved previous as 1.two-sum.1.py; new template at 1.two-sum.py`.
 
-```text
-~/Codes/dsa-ml-practice/leetcode/Easy/Array/1.two-sum.py
-```
+So your workflow is:
 
-If you `pick` the same problem again, the CLI overwrites that exact
-file. It does not have a built-in "multiple approaches" mode.
+1. Press `p` on a problem. Edit the file in nvim. Save with `:w`.
+2. Want to try a different method? Press `p` again. Your previous
+   attempt is preserved as `1.two-sum.1.py`. A fresh template is
+   opened in nvim. Edit, save, repeat.
+3. List all your attempts with `leetcode snapshot list 1` or by
+   looking at the directory:
+   `ls ~/Codes/dsa-ml-practice/leetcode/Easy/Array/1.two-sum*`.
+4. Compare two attempts with `diff` (system) or with
+   `leetcode snapshot diff 1 1 2` if you saved snapshots.
 
-For multiple approaches to the same problem, use either snapshots
-(recommended) or manual copies.
+This is git-ignored (the workdir is excluded in `.gitignore`).
 
-### Option 1: Snapshots (recommended)
+If you want the snapshot system instead, see below.
+
+### Option: Snapshots (for explicit versioning)
 
 ```bash
 leetcode snapshot save 1 brute-force
@@ -129,24 +148,12 @@ Snapshots live outside the repo, in
 `~/.leetcode/workspaces/dsa-ml-practice/snapshots/`, so they are
 git-ignored and never leak into commits.
 
-### Option 2: Manual copies
-
-```bash
-cp ~/Codes/dsa-ml-practice/leetcode/Easy/Array/1.two-sum.py \
-   ~/Codes/dsa-ml-practice/leetcode/Easy/Array/1.two-sum.brute.py
-```
-
-Then edit `1.two-sum.py` in nvim as your "current" attempt. The watcher
-only fires on file creation/move, so renaming or copying does not
-reopen the original.
-
 ### Important
 
-The watcher will only auto-open a file in the nvim pane when a
-**new** `.py` file is created in the workdir. The watcher's `extract_id`
-uses the leading number in the filename, so snapshots and copies do
-not get hijacked by it. The sentinel (`~/.leetcode/workspaces/.../.current/id`)
-only updates on real TUI picks.
+The watcher only fires on file creation/move events. The sentinel
+(`~/Codes/dsa-ml-practice/leetcode/.current/id`) updates on every
+TUI pick (including re-picks), so `C-a T` will always test the
+freshly opened file.
 
 ## File Layout
 

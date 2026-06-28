@@ -1,0 +1,24 @@
+# Ruff config for the dsa-ml-practice repo.
+# This scopes ruff to the leetcode/ workdir (generated LeetCode
+# templates) and the ml/ practice dir. It silences E501 (line length)
+# because templates can be long, and E402 (module-level imports not
+# at top) because the template inserts a docstring before the import
+# block.
+target-version = "py312"
+line-length = 100
+extend-exclude = [
+  ".venv",
+  "__pycache__",
+  "leetcode/**/.notes",
+  "leetcode/.current",
+]
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = [
+  "E501",  # line length
+  "E402",  # module-level imports
+]
+
+[lint.per-file-ignores]
+"leetcode/**/*.py" = ["F841"]  # unused variables are common in templates

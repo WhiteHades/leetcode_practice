@@ -1,0 +1,23 @@
+{
+  "include": [
+    "leetcode"
+  ],
+  "exclude": [
+    "**/.venv",
+    "**/__pycache__"
+  ],
+  "reportMissingImports": "none",
+  "reportUndefinedVariable": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportOptionalSubscript": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportOptionalIterable": "none",
+  "reportOptionalContains": "none",
+  "reportOptionalCall": "none",
+  "reportTypedDictNotRequiredAccess": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportInvalidTypeForm": "none",
+  "reportCallIssue": "none",
+  "reportArgumentType": "none",
+  "strict": ["leetcode"]
+}
