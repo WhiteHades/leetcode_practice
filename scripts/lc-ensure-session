@@ -25,6 +25,14 @@ pane_command() {
   tmux display-message -p -t "$1" '#{pane_current_command}' 2>/dev/null || true
 }
 
+cancel_pane_mode() {
+  local pane="$1"
+
+  if [ "$(tmux display-message -p -t "$pane" '#{pane_in_mode}' 2>/dev/null || printf 0)" = "1" ]; then
+    tmux send-keys -t "$pane" -X cancel 2>/dev/null || true
+  fi
+}
+
 set_session_hook() {
   if tmux show-hooks -g after-new-window 2>/dev/null | grep -q "$SCRIPTS/lc-new-window"; then
     tmux set-hook -gu after-new-window
@@ -36,6 +44,8 @@ set_session_hook() {
 start_watcher() {
   local pane="$1"
   local pane_pid
+
+  cancel_pane_mode "$pane"
 
   pane_pid="$(tmux display-message -p -t "$pane" '#{pane_pid}')"
   if pgrep -P "$pane_pid" -f "$SCRIPTS/lc-watch" >/dev/null 2>&1; then

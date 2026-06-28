@@ -50,6 +50,10 @@ if ! tmux display-message -p -t "$shell_pane" '#{pane_id}' >/dev/null 2>&1; then
   exit 1
 fi
 
+if [ "$(tmux display-message -p -t "$shell_pane" '#{pane_in_mode}')" = "1" ]; then
+  tmux send-keys -t "$shell_pane" -X cancel 2>/dev/null || true
+fi
+
 target_arg="$(printf '%q' "$target")"
 tmux send-keys -t "$shell_pane" "clear; leetcode submit $target_arg" C-m
 tmux select-pane -t "$origin_pane"
