@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# lc-new-window
+# ------------------------------------------------------------------------------
+# Sets up the standard 3-pane layout inside any new tmux window that is
+# created inside the dsa-ml-practice session. Invoked automatically by the
+# `after-new-window` tmux hook that `make tmux` registers.
+#
+# Standard layout (window = any new window name):
+#   pane 0  LEFT          : leetcode TUI  (the browser, source of truth)
+#   pane 1  TOP-RIGHT     : nvim          (edits the picked .py file)
+#   pane 2  BOTTOM-RIGHT  : shell + lc-watch watcher (test/submit output)
+#
+# All paths are relative to the user's $HOME; no personal identifiers are
+# embedded in this script.
+# ------------------------------------------------------------------------------
+set -euo pipefail
+
+WORKDIR="$HOME/Codes/dsa-ml-practice/leetcode"
+SCRIPTS="$HOME/Codes/dsa-ml-practice/scripts"
+SESSION="dsa-ml-practice"
+
+# tmux runs hooks with the calling shell's TMUX_PANE set. We rebuild the
+# session+window target from that. If we are not inside tmux, exit cleanly.
+if [ -z "${TMUX_PANE:-}" ]; then
+  exit 0
+fi
+
+window_id="$(tmux display-message -p -t "$TMUX_PANE" '#{window_id}')"
+target="${SESSION}:${window_id}"
+
+# Pane 0 is the new-window's initial pane. Re-purpose it as the TUI pane.
+tmux send-keys -t "${target}.0" 'leetcode' C-m
+
+# Pane 1: top-right nvim.
+tmux split-window -h -t "${target}.0" -c "$WORKDIR"
+tmux send-keys -t "${target}.1" 'nvim' C-m
+
+# Pane 2: bottom-right shell running the watcher (which auto-opens
+# newly picked .py files in pane 1 and writes the current id to a
+# sentinel for the C-a T / C-a S keybinds).
+tmux split-window -v -t "${target}.1" -c "$WORKDIR"
+tmux send-keys -t "${target}.2" "$SCRIPTS/lc-watch" C-m
+
+# Land the user on the TUI pane so they can browse.
+tmux select-pane -t "${target}.0"

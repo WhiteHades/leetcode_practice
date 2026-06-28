@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# lc-watch
+# ------------------------------------------------------------------------------
+# inotifywait-based bridge between the leetcode TUI's `p` (pick) action and
+# the nvim pane in the same window. Runs in the bottom-right pane.
+#
+# What it does:
+#   1. Watches $WORKDIR for new or moved-in .py files.
+#   2. When one appears, sends `:edit <path>` to the nvim pane in the
+#      SAME window (pane .1 in the standard 3-pane layout) so the
+#      picked solution auto-opens.
+#   3. Writes the problem id extracted from the filename to a sentinel
+#      file at $WORKDIR/.current/id so the test/submit keybinds
+#      (C-a T, C-a S) know which problem is active.
+#
+# This script does NOT need to be invoked manually. The `make tmux` target
+# starts it in pane .2 of the initial window, and `lc-new-window` starts
+# it in pane .2 of every subsequent window.
+# ------------------------------------------------------------------------------
+set -euo pipefail
+
+WORKDIR="$HOME/Codes/dsa-ml-practice/leetcode"
+SENTINEL="$WORKDIR/.current/id"
+
+mkdir -p "$(dirname "$SENTINEL")"
+
+# $TMUX_PANE is the pane that ran this script (the bottom-right shell).
+my_pane="${TMUX_PANE:-}"
+if [ -z "$my_pane" ]; then
+  echo "lc-watch: not running inside a tmux pane" >&2
+  exit 1
+fi
+
+window_id="$(tmux display-message -p -t "$my_pane" '#{window_id}')"
+nvim_pane="${window_id}.1"
+
+# Extract the leading problem id from "<id>.<slug>.<ext>" e.g. 1.two-sum.py
+extract_id() {
+  basename "$1" | sed -E 's/^([0-9]+)\..*/\1/'
+}
+
+inotifywait -m "$WORKDIR" -e create -e moved_to --format '%w%f' | \
+  while read -r path; do
+    case "$path" in
+      *.py)
+        id="$(extract_id "$path")"
+        if [ -n "$id" ]; then
+          printf '%s\n' "$id" > "$SENTINEL"
+        fi
+        tmux send-keys -t "$nvim_pane" ":edit $path" C-m
+        ;;
+    esac
+  done

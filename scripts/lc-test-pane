@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# lc-test-pane
+# ------------------------------------------------------------------------------
+# Runs `leetcode test <id>` inside the bottom-right pane of the active
+# tmux window. The id is taken from the first argument if provided,
+# otherwise from the sentinel file at $WORKDIR/.current/id that
+# lc-watch writes whenever a problem is picked in the TUI.
+#
+# Bound by default to `C-a T` via a tmux keybind in the user's dotfiles
+# (see ~/dotfiles/tmux/.tmux.conf).
+# ------------------------------------------------------------------------------
+set -euo pipefail
+
+SENTINEL="$HOME/Codes/dsa-ml-practice/leetcode/.current/id"
+
+id="${1:-}"
+if [ -z "$id" ] && [ -f "$SENTINEL" ]; then
+  id="$(cat "$SENTINEL")"
+fi
+if [ -z "$id" ]; then
+  echo "lc-test-pane: no problem id given and no sentinel at $SENTINEL" >&2
+  exit 1
+fi
+
+my_pane="${TMUX_PANE:-}"
+if [ -z "$my_pane" ]; then
+  tmux send-keys "clear; leetcode test $id" C-m
+  exit 0
+fi
+
+window_id="$(tmux display-message -p -t "$my_pane" '#{window_id}')"
+shell_pane="${window_id}.2"
+
+tmux send-keys -t "$shell_pane" "clear; leetcode test $id" C-m

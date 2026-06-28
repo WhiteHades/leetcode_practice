@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# lc-current-id
+# ------------------------------------------------------------------------------
+# Prints the currently active problem id (as recorded by lc-watch after the
+# TUI's `p` action). Fails if no sentinel exists. Useful for shell
+# pipelines or shell functions that need the current problem.
+# ------------------------------------------------------------------------------
+set -euo pipefail
+
+SENTINEL="$HOME/Codes/dsa-ml-practice/leetcode/.current/id"
+
+if [ ! -f "$SENTINEL" ]; then
+  echo "no current problem sentinel at $SENTINEL" >&2
+  exit 1
+fi
+
+cat "$SENTINEL"

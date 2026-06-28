@@ -1,0 +1,31 @@
+.venv/
+.env
+.env.*
+!.env.example
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Generated leetcode-cli artifacts. These are personal work-in-progress
+# solutions, notes, and test data and must not leak into a public repo.
+# The CLI writes into ~/Codes/dsa-ml-practice/leetcode which is the
+# same path as this repo's `leetcode/` directory; .gitignore below
+# keeps the public tree clean.
+leetcode/**/*.py
+leetcode/**/.notes/
+leetcode/**/*.tests.dat
+leetcode/**/.leetcode-cache/
+leetcode/**/.DS_Store
+leetcode/**/.current/
+
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+
+.DS_Store
+Thumbs.db
