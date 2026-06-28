@@ -7,22 +7,22 @@
 # What it does:
 #   1. Watches $WORKDIR for new or moved-in .py files.
 #   2. When one appears, sends `:edit <path>` to the nvim pane in the
-#      SAME window (pane .1 in the standard 3-pane layout) so the
+#      same window (pane .2 in the standard 3-pane layout) so the
 #      picked solution auto-opens.
-#   3. Writes the problem id extracted from the filename to a sentinel
-#      file at $WORKDIR/.current/id so the test/submit keybinds
-#      (C-a T, C-a S) know which problem is active.
+#   3. Writes the problem id and path to sentinels under $WORKDIR/.current/
+#      so the test/submit keybinds (C-a T, C-a S) target the active file.
 #
 # This script does NOT need to be invoked manually. The `make tmux` target
-# starts it in pane .2 of the initial window, and `lc-new-window` starts
-# it in pane .2 of every subsequent window.
+# starts it in pane .3 of the initial window, and `lc-new-window` starts
+# it in pane .3 of every subsequent window.
 # ------------------------------------------------------------------------------
 set -euo pipefail
 
 WORKDIR="$HOME/Codes/dsa-ml-practice/leetcode"
-SENTINEL="$WORKDIR/.current/id"
+ID_SENTINEL="$WORKDIR/.current/id"
+PATH_SENTINEL="$WORKDIR/.current/path"
 
-mkdir -p "$(dirname "$SENTINEL")"
+mkdir -p "$(dirname "$ID_SENTINEL")"
 
 # $TMUX_PANE is the pane that ran this script (the bottom-right shell).
 my_pane="${TMUX_PANE:-}"
@@ -32,22 +32,52 @@ if [ -z "$my_pane" ]; then
 fi
 
 window_id="$(tmux display-message -p -t "$my_pane" '#{window_id}')"
-nvim_pane="${window_id}.2"   # second pane in the window (0-based after we split)
+nvim_pane="${window_id}.2"
 
 # Extract the leading problem id from "<id>.<slug>.<ext>" e.g. 1.two-sum.py
 extract_id() {
   basename "$1" | sed -E 's/^([0-9]+)\..*/\1/'
 }
 
+is_primary_solution() {
+  basename "$1" | grep -Eq '^[0-9]+\.[^.]+\.py$'
+}
+
+escape_vim_path() {
+  printf '%s' "$1" | sed -e 's/[\\ %#|]/\\&/g'
+}
+
+ensure_python_body() {
+  python3 - "$1" <<'PY'
+from pathlib import Path
+import re
+import sys
+
+path = Path(sys.argv[1])
+lines = path.read_text().splitlines()
+i = len(lines) - 1
+while i >= 0 and not lines[i].strip():
+    i -= 1
+if i < 0 or not lines[i].rstrip().endswith(":"):
+    raise SystemExit
+
+indent = re.match(r"^(\s*)", lines[i]).group(1) + "    "
+path.write_text("\n".join(lines[: i + 1] + [f"{indent}pass"]) + "\n")
+PY
+}
+
 inotifywait -m -r "$WORKDIR" -e create -e moved_to --format '%w%f' | \
   while read -r path; do
     case "$path" in
       *.py)
+        is_primary_solution "$path" || continue
+        ensure_python_body "$path"
         id="$(extract_id "$path")"
         if [ -n "$id" ]; then
-          printf '%s\n' "$id" > "$SENTINEL"
+          printf '%s\n' "$id" > "$ID_SENTINEL"
         fi
-        tmux send-keys -t "$nvim_pane" ":edit $path" C-m
+        printf '%s\n' "$path" > "$PATH_SENTINEL"
+        tmux send-keys -t "$nvim_pane" ":edit $(escape_vim_path "$path")" C-m
         ;;
     esac
   done

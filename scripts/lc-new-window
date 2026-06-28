@@ -38,7 +38,7 @@ target="${SESSION}:${window_id}"
 tmux send-keys -t "${target}.1" 'leetcode' C-m
 
 # Pane 2: top-right nvim.
-tmux split-window -h -t "${target}.1" -c "$WORKDIR"
+tmux split-window -h -p 65 -t "${target}.1" -c "$WORKDIR"
 tmux send-keys -t "${target}.2" 'nvim' C-m
 
 # Pane 3: bottom-right shell running the watcher in the background
@@ -47,6 +47,9 @@ tmux send-keys -t "${target}.2" 'nvim' C-m
 # must run in the background so the shell is free to run test/submit
 # commands in the same pane.
 tmux split-window -v -t "${target}.2" -c "$WORKDIR"
+window_width="$(tmux display-message -p -t "$target" '#{window_width}')"
+left_width=$((window_width * 35 / 100))
+tmux resize-pane -t "${target}.1" -x "$left_width"
 tmux resize-pane -t "${target}.3" -y 25%
 tmux send-keys -t "${target}.3" "$SCRIPTS/lc-watch &" C-m
 tmux send-keys -t "${target}.3" "disown" C-m

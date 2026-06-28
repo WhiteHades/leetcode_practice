@@ -6,19 +6,20 @@ The repo is built around a single 3-pane tmux session that recreates the
 LeetCode.com browser experience in your terminal:
 
 ```text
-+------------------+------------------------+
-|  LEFT            |  TOP-RIGHT            |
-|  leetcode TUI    |  nvim (code editor)   |
-|  (browse, pick,  |                        |
-|   hints, stats)  +------------------------+
-|                  |  BOTTOM-RIGHT          |
-|                  |  shell                 |
-|                  |  (test/submit output)  |
-+------------------+------------------------+
++-------------+---------------------------+
+|  LEFT 35%   |  TOP-RIGHT 65%            |
+|  leetcode   |  nvim (code editor)       |
+|  TUI        |                           |
+|             +---------------------------+
+|             |  BOTTOM-RIGHT             |
+|             |  shell                    |
+|             |  (test/submit output)     |
++-------------+---------------------------+
 ```
 
 Every new tmux window in the session automatically starts with this same
-3-pane layout. The session is started from a Makefile target; the
+3-pane layout. The session is started from a Makefile target, which also
+repairs a stale or partially restored session before attaching. The
 TUI-to-editor hand-off is wired by an inotifywait watcher. Test and
 submit run in the bottom-right pane through tmux keybinds.
 
@@ -72,13 +73,16 @@ Open `make tmux` from any directory; it is the single entry point.
 2. Use the TUI to browse, filter, hint, and inspect submissions.
 3. When you find a problem you want, press `p` in the TUI to pick it.
    This writes the solution `.py` file under the workspace workdir.
-4. The inotifywait watcher detects the new file and sends
-   `:edit <path>` to the nvim pane, so the editor auto-opens it.
+4. The inotifywait watcher detects the new primary file, records that
+   exact path under `.current/path`, and sends `:edit <path>` to the
+   nvim pane, so the editor auto-opens it.
 5. Edit the solution in the nvim pane.
-6. Press `C-a T` to run `leetcode test <id>` in the bottom-right pane.
-   The id is read from the sentinel that the watcher writes; you can
-   also pass a different id at the prompt.
-7. Press `C-a S` to submit. Output streams in the bottom-right pane.
+6. Press `C-a T` to run `leetcode test <current-path>` in the
+   bottom-right pane. The path is read from the sentinel that the
+   watcher writes, so numbered older attempts are not picked by
+   accident.
+7. Press `C-a S` to submit that same current path. Output streams in
+   the bottom-right pane.
 8. Press `C-a c` to open a new window. It is auto-split into the same
    3-pane layout, so you can solve a second problem in parallel.
 9. Detach with `C-a d` and reattach with `make tmux` later. Pane state
@@ -87,17 +91,16 @@ Open `make tmux` from any directory; it is the single entry point.
 
 ## Keybinds (added in dotfiles)
 
-- `C-a T` — run `leetcode test <id>` in the bottom-right pane.
-  Argument: id or empty (uses the current sentinel).
-- `C-a S` — run `leetcode submit <id>` in the bottom-right pane.
-  Argument: id or empty (uses the current sentinel).
+- `C-a T` — run `leetcode test <current-path>` in the bottom-right pane.
+- `C-a S` — run `leetcode submit <current-path>` in the bottom-right pane.
 - `C-a c` — new window, auto-split into the same 3-pane layout.
 - `C-a d` — detach.
 - `C-a r` — reload `~/.tmux.conf` (unchanged from your dotfiles).
 
 If `C-a T` or `C-a S` does nothing, press `C-a r` to reload the tmux
 config (the keybinds are loaded into the running server, not just
-into new sessions).
+into new sessions). Re-running `make tmux` also repairs the standard
+layout if tmux-continuum restored stale panes.
 
 ## How Multiple Approaches to the Same Problem Work
 
@@ -112,9 +115,9 @@ When you press `p` on a problem whose solution file already exists:
    `1.two-sum.1.py`).
 3. A fresh template is written to the original path
    (`<id>.<slug>.<ext>`).
-4. The inotifywait watcher detects the new template, writes the
-   problem id to the sentinel, and sends `:edit <path>` to the nvim
-   pane, opening the fresh template.
+4. The inotifywait watcher ignores the archived numbered file, detects
+   the fresh primary template, writes the problem id and path to the
+   sentinels, and sends `:edit <path>` to the nvim pane.
 5. The TUI status drawer shows the rename: e.g.
    `Saved previous as 1.two-sum.1.py; new template at 1.two-sum.py`.
 
@@ -122,8 +125,8 @@ So your workflow is:
 
 1. Press `p` on a problem. Edit the file in nvim. Save with `:w`.
 2. Want to try a different method? Press `p` again. Your previous
-   attempt is preserved as `1.two-sum.1.py`. A fresh template is
-   opened in nvim. Edit, save, repeat.
+   attempt is preserved as `1.two-sum.1.py`. A fresh primary template
+   is opened as `1.two-sum.py`. Edit, save, repeat.
 3. List all your attempts with `leetcode snapshot list 1` or by
    looking at the directory:
    `ls ~/Codes/dsa-ml-practice/leetcode/Easy/Array/1.two-sum*`.
@@ -150,10 +153,12 @@ git-ignored and never leak into commits.
 
 ### Important
 
-The watcher only fires on file creation/move events. The sentinel
-(`~/Codes/dsa-ml-practice/leetcode/.current/id`) updates on every
-TUI pick (including re-picks), so `C-a T` will always test the
-freshly opened file.
+The unnumbered file is the current attempt. Numbered files are archived
+older attempts in creation order. The watcher only fires on file
+creation/move events. The sentinels under
+`~/Codes/dsa-ml-practice/leetcode/.current/` update on every TUI pick
+(including re-picks), so `C-a T` and `C-a S` target the freshly opened
+file path.
 
 ## File Layout
 
@@ -168,10 +173,11 @@ dsa-ml-practice/
 ├── ml/                    # placeholder for future ML practice
 ├── pyproject.toml         # Python deps (ipython + optional ML)
 ├── scripts/
+│   ├── lc-ensure-session  # create/repair the tmux session before attach
 │   ├── lc-new-window      # called by after-new-window tmux hook
-│   ├── lc-watch           # inotifywait watcher (file -> nvim + sentinel)
 │   ├── lc-test-pane       # `C-a T`: leetcode test in bottom-right pane
 │   ├── lc-submit-pane     # `C-a S`: leetcode submit in bottom-right pane
+│   ├── lc-watch           # inotifywait watcher (file -> nvim + sentinel)
 │   └── lc-current-id      # print sentinel id (for shell pipelines)
 └── uv.lock
 ```

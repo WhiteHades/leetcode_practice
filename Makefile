@@ -43,27 +43,14 @@ config:
 
 # Open or attach the 3-pane practice tmux session.
 # Layout per window:
-#   pane 0 LEFT          : leetcode TUI
-#   pane 1 TOP-RIGHT     : nvim (edits the picked .py)
-#   pane 2 BOTTOM-RIGHT  : shell (test/submit output, see T/S keybinds)
+#   pane 1 LEFT          : leetcode TUI
+#   pane 2 TOP-RIGHT     : nvim (edits the picked .py)
+#   pane 3 BOTTOM-RIGHT  : shell (test/submit output, see T/S keybinds)
 # Auto-3-pane for every new window in the session is enabled by the
-# after-new-window hook set below, which runs scripts/lc-new-window.
+# after-new-window hook in scripts/lc-ensure-session.
 tmux:
-	@if tmux has-session -t $(SESSION) 2>/dev/null; then \
-		tmux attach -t $(SESSION); \
-	else \
-		mkdir -p "$(WORKDIR)"; \
-		tmux new-session -d -s $(SESSION) -n problems -c "$(WORKDIR)" 'leetcode'; \
-		tmux split-window -h -t $(SESSION):problems -c "$(WORKDIR)"; \
-		tmux split-window -v -t $(SESSION):problems.2 -c "$(WORKDIR)"; \
-		tmux resize-pane -t $(SESSION):problems.3 -y 25%; \
-		tmux send-keys -t $(SESSION):problems.2 'nvim' C-m; \
-		tmux send-keys -t $(SESSION):problems.3 "$(SCRIPTS)/lc-watch &" C-m; \
-		tmux send-keys -t $(SESSION):problems.3 "disown" C-m; \
-		tmux send-keys -t $(SESSION):problems.3 "clear" C-m; \
-		tmux set-hook -g after-new-window 'run-shell \"$(SCRIPTS)/lc-new-window\"'; \
-		tmux attach -t $(SESSION); \
-	fi
+	@$(SCRIPTS)/lc-ensure-session
+	@tmux attach -t $(SESSION)
 
 clean:
 	rm -rf .pytest_cache .ruff_cache __pycache__ scripts/__pycache__

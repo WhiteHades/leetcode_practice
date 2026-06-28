@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# lc-ensure-session
+# ------------------------------------------------------------------------------
+# Creates or repairs the dsa-ml-practice tmux session before attaching.
+# It is intentionally conservative: if an existing window cannot be repaired
+# without killing panes, it creates a fresh healthy window and leaves the old
+# one intact.
+# ------------------------------------------------------------------------------
+set -euo pipefail
+
+WORKDIR="$HOME/Codes/dsa-ml-practice/leetcode"
+SCRIPTS="$HOME/Codes/dsa-ml-practice/scripts"
+SESSION="dsa-ml-practice"
+
+mkdir -p "$WORKDIR"
+
+is_shell() {
+  case "$1" in
+    bash|fish|sh|zsh) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+pane_command() {
+  tmux display-message -p -t "$1" '#{pane_current_command}' 2>/dev/null || true
+}
+
+set_session_hook() {
+  if tmux show-hooks -g after-new-window 2>/dev/null | grep -q "$SCRIPTS/lc-new-window"; then
+    tmux set-hook -gu after-new-window
+  fi
+
+  tmux set-hook -t "$SESSION" after-new-window "run-shell \"$SCRIPTS/lc-new-window\""
+}
+
+start_watcher() {
+  local pane="$1"
+  local pane_pid
+
+  pane_pid="$(tmux display-message -p -t "$pane" '#{pane_pid}')"
+  if pgrep -P "$pane_pid" -f "$SCRIPTS/lc-watch" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  tmux send-keys -t "$pane" "$SCRIPTS/lc-watch &" C-m
+  tmux send-keys -t "$pane" "disown" C-m
+  tmux send-keys -t "$pane" "clear" C-m
+}
+
+apply_layout() {
+  local target="$1"
+  local window_width left_width
+
+  window_width="$(tmux display-message -p -t "$target" '#{window_width}')"
+  left_width=$((window_width * 35 / 100))
+  tmux resize-pane -t "${target}.1" -x "$left_width"
+  tmux resize-pane -t "${target}.3" -y 25%
+}
+
+setup_window() {
+  local target="$1"
+
+  tmux send-keys -t "${target}.1" 'leetcode' C-m
+  tmux split-window -h -p 65 -t "${target}.1" -c "$WORKDIR"
+  tmux send-keys -t "${target}.2" 'nvim' C-m
+  tmux split-window -v -t "${target}.2" -c "$WORKDIR"
+  apply_layout "$target"
+  start_watcher "${target}.3"
+  tmux select-pane -t "${target}.1"
+}
+
+create_session() {
+  tmux new-session -d -s "$SESSION" -n problems -c "$WORKDIR"
+  setup_window "$SESSION:problems"
+  set_session_hook
+}
+
+create_window() {
+  local window_id
+
+  tmux set-hook -t "$SESSION" -u after-new-window 2>/dev/null || true
+  window_id="$(tmux new-window -d -P -F '#{window_id}' -t "$SESSION:" -n problems -c "$WORKDIR")"
+  setup_window "$SESSION:$window_id"
+  set_session_hook
+  tmux select-window -t "$SESSION:$window_id"
+}
+
+repair_window() {
+  local window="$1"
+  local pane_count cmd1 cmd2 cmd3
+
+  pane_count="$(tmux list-panes -t "$window" 2>/dev/null | wc -l)"
+  [ "$pane_count" -eq 3 ] || return 1
+
+  cmd1="$(pane_command "${window}.1")"
+  cmd2="$(pane_command "${window}.2")"
+  cmd3="$(pane_command "${window}.3")"
+
+  if [ "$cmd1" != "node" ]; then
+    is_shell "$cmd1" || return 1
+    tmux send-keys -t "${window}.1" 'leetcode' C-m
+  fi
+
+  if [ "$cmd2" != "nvim" ]; then
+    is_shell "$cmd2" || return 1
+    tmux send-keys -t "${window}.2" 'nvim' C-m
+  fi
+
+  is_shell "$cmd3" || return 1
+  apply_layout "$window"
+  start_watcher "${window}.3"
+  tmux select-window -t "$window"
+}
+
+if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+  create_session
+  exit 0
+fi
+
+set_session_hook
+
+if ! repair_window "$SESSION:1"; then
+  create_window
+fi

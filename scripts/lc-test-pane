@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # lc-test-pane
 # ------------------------------------------------------------------------------
-# Runs `leetcode test <id>` inside the bottom-right pane of the active
-# tmux window. The id is taken from the first argument if provided,
-# otherwise from the sentinel file at $WORKDIR/.current/id that
+# Runs `leetcode test <path>` inside the bottom-right pane of the active
+# tmux window. The target is taken from the first argument if provided,
+# otherwise from the sentinel files under $WORKDIR/.current/ that
 # lc-watch writes whenever a problem is picked in the TUI.
 #
 # Bound by default to `C-a T` via a tmux keybind in the user's dotfiles
@@ -11,27 +11,45 @@
 # ------------------------------------------------------------------------------
 set -euo pipefail
 
-SENTINEL="$HOME/Codes/dsa-ml-practice/leetcode/.current/id"
+WORKDIR="$HOME/Codes/dsa-ml-practice/leetcode"
+ID_SENTINEL="$WORKDIR/.current/id"
+PATH_SENTINEL="$WORKDIR/.current/path"
 
-id="${1:-}"
-if [ -z "$id" ] && [ -f "$SENTINEL" ]; then
-  id="$(cat "$SENTINEL")"
+target="${1:-}"
+if [ -z "$target" ] && [ -f "$PATH_SENTINEL" ]; then
+  target="$(cat "$PATH_SENTINEL")"
 fi
-if [ -z "$id" ]; then
-  echo "lc-test-pane: no problem id given and no sentinel at $SENTINEL" >&2
+if [ -z "$target" ] && [ -f "$ID_SENTINEL" ]; then
+  target="$(cat "$ID_SENTINEL")"
+fi
+if [ -z "$target" ]; then
+  echo "lc-test-pane: no current problem at $PATH_SENTINEL or $ID_SENTINEL" >&2
   exit 1
 fi
+case "$target" in
+  "$WORKDIR"/*.py) ;;
+  *[!0-9]*)
+    echo "lc-test-pane: invalid target outside workdir: $target" >&2
+    exit 1
+    ;;
+esac
 
-my_pane="${TMUX_PANE:-}"
-if [ -z "$my_pane" ]; then
-  tmux send-keys "clear; leetcode test $id" C-m
-  exit 0
+origin_pane="${LC_TMUX_PANE:-${TMUX_PANE:-}}"
+if [ -z "$origin_pane" ]; then
+  origin_pane="$(tmux display-message -p '#{pane_id}')"
 fi
 
 # Panes are 1-indexed because of `set -g pane-base-index 1` in the
 # user's dotfiles. The shell (test/submit output) pane is pane 3 of
 # the active window.
-window_id="$(tmux display-message -p -t "$my_pane" '#{window_id}')"
+window_id="$(tmux display-message -p -t "$origin_pane" '#{window_id}')"
 shell_pane="${window_id}.3"
 
-tmux send-keys -t "$shell_pane" "clear; leetcode test $id" C-m
+if ! tmux display-message -p -t "$shell_pane" '#{pane_id}' >/dev/null 2>&1; then
+  echo "lc-test-pane: no shell pane at $shell_pane" >&2
+  exit 1
+fi
+
+target_arg="$(printf '%q' "$target")"
+tmux send-keys -t "$shell_pane" "clear; leetcode test $target_arg" C-m
+tmux select-pane -t "$origin_pane"

@@ -6,18 +6,21 @@
     "**/.venv",
     "**/__pycache__"
   ],
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "off",
   "reportMissingImports": "none",
   "reportUndefinedVariable": "none",
   "reportGeneralTypeIssues": "none",
+  "reportUnknownParameterType": "none",
+  "reportUnknownVariableType": "none",
+  "reportUnknownArgumentType": "none",
   "reportOptionalSubscript": "none",
   "reportOptionalMemberAccess": "none",
   "reportOptionalIterable": "none",
-  "reportOptionalContains": "none",
   "reportOptionalCall": "none",
   "reportTypedDictNotRequiredAccess": "none",
   "reportAttributeAccessIssue": "none",
   "reportInvalidTypeForm": "none",
   "reportCallIssue": "none",
-  "reportArgumentType": "none",
-  "strict": ["leetcode"]
+  "reportArgumentType": "none"
 }
