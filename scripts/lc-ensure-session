@@ -41,29 +41,6 @@ pane_command() {
   tmux display-message -p -t "$1" '#{pane_current_command}' 2>/dev/null || true
 }
 
-process_tree_has_opencode() {
-  local pid="$1" child cmd args
-
-  for child in $(pgrep -P "$pid" 2>/dev/null || true); do
-    cmd="$(ps -o comm= -p "$child" 2>/dev/null || true)"
-    args="$(ps -o args= -p "$child" 2>/dev/null || true)"
-    case "$cmd $args" in
-      *lc-opencode-pane*|*opencode*) return 0 ;;
-    esac
-    process_tree_has_opencode "$child" && return 0
-  done
-
-  return 1
-}
-
-pane_has_opencode() {
-  local pane="$1" pane_pid
-
-  pane_pid="$(tmux display-message -p -t "$pane" '#{pane_pid}' 2>/dev/null || true)"
-  [ -n "$pane_pid" ] || return 1
-  process_tree_has_opencode "$pane_pid"
-}
-
 cancel_pane_mode() {
   local pane="$1"
 
@@ -78,12 +55,6 @@ set_session_hook() {
   fi
 
   tmux set-hook -t "$SESSION" after-new-window "run-shell \"$SCRIPTS/lc-new-window\""
-}
-
-with_hook_disabled() {
-  tmux set-hook -t "$SESSION" -u after-new-window 2>/dev/null || true
-  "$@"
-  set_session_hook
 }
 
 start_watcher() {
@@ -107,9 +78,26 @@ apply_layout() {
   local window_width left_width
 
   window_width="$(tmux display-message -p -t "$target" '#{window_width}')"
-  left_width=$((window_width * 35 / 100))
+  left_width=$(((window_width * 45 + 50) / 100))
   tmux resize-pane -t "${target}.1" -x "$left_width"
   tmux resize-pane -t "${target}.3" -y 25%
+}
+
+remove_tmux_opencode_windows() {
+  local window
+
+  while IFS= read -r window; do
+    [ -n "$window" ] || continue
+    tmux kill-window -t "$SESSION:$window" 2>/dev/null || true
+  done < <(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name}' 2>/dev/null | awk '$2 == "opencode" { print $1 }')
+}
+
+open_opencode_window() {
+  "$SCRIPTS/lc-opencode-window" --no-focus --base-workspace "${LC_OPENCODE_BASE_WORKSPACE:-}" || true
+}
+
+start_opencode_watch() {
+  LC_OPENCODE_BASE_WORKSPACE="${LC_OPENCODE_BASE_WORKSPACE:-}" "$SCRIPTS/lc-opencode-watch" --replace >/dev/null 2>&1 &
 }
 
 setup_window() {
@@ -127,7 +115,6 @@ setup_window() {
 create_session() {
   tmux new-session -d -s "$SESSION" -n problems -c "$WORKDIR"
   setup_window "$SESSION:problems"
-  ensure_opencode_window
   set_session_hook
   tmux select-window -t "$SESSION:1"
 }
@@ -140,56 +127,6 @@ create_window() {
   setup_window "$SESSION:$window_id"
   set_session_hook
   tmux select-window -t "$SESSION:$window_id"
-}
-
-start_opencode() {
-  local pane="$1" cmd
-
-  cancel_pane_mode "$pane"
-  if pane_has_opencode "$pane"; then
-    return 0
-  fi
-
-  cmd="$(pane_command "$pane")"
-  if [ "$cmd" = "opencode" ] || [ "$cmd" = "lc-opencode-pane" ]; then
-    return 0
-  fi
-
-  is_shell "$cmd" || return 1
-  tmux send-keys -t "$pane" C-c
-  tmux send-keys -t "$pane" 'reset' C-m
-  tmux send-keys -t "$pane" 'clear' C-m
-  tmux send-keys -t "$pane" "cd \"$ROOT\" && \"$SCRIPTS/lc-opencode-pane\"" C-m
-}
-
-create_opencode_window() {
-  local window_id
-
-  window_id="$(tmux new-window -d -P -F '#{window_id}' -t "$SESSION:2" -n opencode -c "$ROOT" 2>/dev/null || true)"
-  if [ -z "$window_id" ]; then
-    window_id="$(tmux new-window -d -P -F '#{window_id}' -t "$SESSION:" -n opencode -c "$ROOT")"
-  fi
-
-  start_opencode "$SESSION:$window_id.1" || true
-}
-
-ensure_opencode_window() {
-  local window pane_count pane
-
-  window="$(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name}' | awk '$2 == "opencode" { print $1; exit }')"
-  if [ -z "$window" ]; then
-    with_hook_disabled create_opencode_window
-    return 0
-  fi
-
-  pane_count="$(tmux list-panes -t "$SESSION:$window" 2>/dev/null | wc -l)"
-  if [ "$pane_count" -gt 1 ]; then
-    for pane in $(tmux list-panes -t "$SESSION:$window" -F '#{pane_id}' | tail -n +2); do
-      tmux kill-pane -t "$pane" 2>/dev/null || true
-    done
-  fi
-
-  start_opencode "$SESSION:$window.1" || true
 }
 
 repair_window() {
@@ -221,15 +158,20 @@ repair_window() {
 
 if ! tmux has-session -t "$SESSION" 2>/dev/null; then
   create_session
+  remove_tmux_opencode_windows
+  open_opencode_window
+  start_opencode_watch
   exit 0
 fi
 
 set_session_hook
+remove_tmux_opencode_windows
 
 if ! repair_window "$SESSION:1"; then
   create_window
 fi
 
 problem_window="$(tmux display-message -p -t "$SESSION" '#{window_id}')"
-ensure_opencode_window
+open_opencode_window
+start_opencode_watch
 tmux select-window -t "$SESSION:$problem_window"

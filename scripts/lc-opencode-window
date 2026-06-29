@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# lc-opencode-window
+# ------------------------------------------------------------------------------
+# Opens/focuses the repo OpenCode tutor in a normal Ghostty window on the
+# workspace to the right of the workspace that launched the LeetCode tmux flow.
+# ------------------------------------------------------------------------------
+set -euo pipefail
+
+ROOT="${LC_REPO_ROOT:-$HOME/Codes/dsa-ml-practice}"
+SCRIPTS="$ROOT/scripts"
+STATE_DIR="$ROOT/.cache/opencode"
+TOPIC_STATE="$STATE_DIR/window-topic"
+ADDRESS_STATE="$STATE_DIR/window-address"
+WINDOW_LOG="$STATE_DIR/window.log"
+
+focus=1
+base_workspace="${LC_OPENCODE_BASE_WORKSPACE:-}"
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --no-focus)
+      focus=0
+      shift
+      ;;
+    --base-workspace)
+      base_workspace="${2:-}"
+      shift 2
+      ;;
+    *)
+      printf 'lc-opencode-window: unknown argument: %s\n' "$1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+mkdir -p "$STATE_DIR"
+
+if ! command -v opencode >/dev/null 2>&1; then
+  printf 'lc-opencode-window: opencode is not installed; skipping tutor window\n' >&2
+  exit 0
+fi
+
+if ! command -v hyprctl >/dev/null 2>&1 || ! command -v ghostty >/dev/null 2>&1; then
+  if [ "$focus" -eq 0 ]; then
+    exit 0
+  fi
+  exec "$SCRIPTS/lc-opencode"
+fi
+
+current_topic="$($SCRIPTS/lc-opencode --print-title)"
+
+active_workspace_id() {
+  hyprctl activeworkspace -j | node -e '
+const fs = require("fs");
+const input = JSON.parse(fs.readFileSync(0, "utf8"));
+if (Number.isInteger(input.id)) process.stdout.write(String(input.id));
+'
+}
+
+client_for_address() {
+  local address="$1"
+
+  hyprctl clients -j | ADDRESS="$address" node -e '
+const fs = require("fs");
+const address = process.env.ADDRESS;
+const clients = JSON.parse(fs.readFileSync(0, "utf8"));
+const match = clients.find((client) => client.address === address);
+if (match) process.stdout.write(JSON.stringify(match));
+'
+}
+
+managed_opencode_client() {
+  local title="$1"
+  local topic="$2"
+  local pid="${3:-}"
+
+  hyprctl clients -j | TITLE="$title" TOPIC="$topic" PID="$pid" CLASS="$window_class" node -e '
+const fs = require("fs");
+const title = process.env.TITLE;
+const topic = process.env.TOPIC;
+const pid = Number(process.env.PID || 0);
+const klass = process.env.CLASS;
+const clients = JSON.parse(fs.readFileSync(0, "utf8"));
+const match = clients.find((client) => client.title === title || client.title === `OC | ${topic}` || client.class === klass || client.initialClass === klass || (pid > 0 && client.pid === pid));
+if (match) process.stdout.write(JSON.stringify(match));
+'
+}
+
+json_field() {
+  local field="$1"
+  node -e '
+const fs = require("fs");
+const field = process.argv[1];
+const input = fs.readFileSync(0, "utf8").trim();
+if (!input) process.exit(0);
+const value = JSON.parse(input)[field];
+if (value !== undefined && value !== null) process.stdout.write(String(value));
+' "$field"
+}
+
+if [ -z "$base_workspace" ]; then
+  base_workspace="$(active_workspace_id)"
+fi
+
+case "$base_workspace" in
+  ''|*[!0-9]*) base_workspace=1 ;;
+esac
+
+target_workspace="${LC_OPENCODE_TARGET_WORKSPACE:-$((base_workspace + 1))}"
+window_title="DSA OpenCode | $current_topic"
+window_class="com.efaz.dsa-opencode"
+
+existing_address=""
+[ -f "$ADDRESS_STATE" ] && existing_address="$(sed -n '1p' "$ADDRESS_STATE" | tr -d '\r')"
+existing=""
+if [ -n "$existing_address" ]; then
+  existing="$(client_for_address "$existing_address" || true)"
+fi
+if [ -z "$existing" ]; then
+  existing="$(managed_opencode_client "$window_title" "$current_topic" || true)"
+  existing_address="$(printf '%s' "$existing" | json_field address || true)"
+fi
+existing_title="$(printf '%s' "$existing" | json_field title || true)"
+existing_class="$(printf '%s' "$existing" | json_field class || true)"
+existing_initial_class="$(printf '%s' "$existing" | json_field initialClass || true)"
+existing_topic=""
+[ -f "$TOPIC_STATE" ] && existing_topic="$(sed -n '1p' "$TOPIC_STATE" | tr -d '\r')"
+
+launch_window() {
+  : > "$WINDOW_LOG"
+
+  ghostty \
+    --class="$window_class" \
+    --title="$window_title" \
+    --gtk-single-instance=false \
+    --working-directory="$ROOT" \
+    -e "$SCRIPTS/lc-opencode-terminal" >"$WINDOW_LOG" 2>&1 &
+  ghostty_pid="$!"
+}
+
+if [ -n "$existing_address" ]; then
+  if [ -z "$existing" ]; then
+    existing_address=""
+  fi
+fi
+
+if [ -n "$existing_address" ]; then
+  if [ "$existing_title" = "$window_title" ] || [ "$existing_title" = "OC | $current_topic" ]; then
+    hyprctl dispatch movetoworkspacesilent "$target_workspace,address:$existing_address" >/dev/null 2>&1 || true
+    if [ "$focus" -eq 1 ]; then
+      hyprctl dispatch workspace "$target_workspace" >/dev/null 2>&1 || true
+      hyprctl dispatch focuswindow "address:$existing_address" >/dev/null 2>&1 || true
+    else
+      hyprctl dispatch workspace "$base_workspace" >/dev/null 2>&1 || true
+    fi
+    exit 0
+  fi
+
+  if [ -n "$existing_topic" ] && { [ "$existing_title" = "DSA OpenCode | $existing_topic" ] || [ "$existing_title" = "OC | $existing_topic" ] || [ "$existing_class" = "$window_class" ] || [ "$existing_initial_class" = "$window_class" ]; }; then
+    hyprctl dispatch closewindow "address:$existing_address" >/dev/null 2>&1 || true
+    rm -f "$ADDRESS_STATE"
+    sleep 1
+  else
+    rm -f "$ADDRESS_STATE"
+  fi
+fi
+
+printf '%s\n' "$current_topic" > "$TOPIC_STATE"
+ghostty_pid=""
+launch_window
+
+new_address=""
+for _ in $(seq 1 600); do
+  sleep 0.1
+  new_client="$(managed_opencode_client "$window_title" "$current_topic" "$ghostty_pid" || true)"
+  new_address="$(printf '%s' "$new_client" | json_field address || true)"
+  [ -n "$new_address" ] && break
+done
+
+if [ -z "$new_address" ]; then
+  printf 'lc-opencode-window: launched Ghostty but could not find the new window\n' >&2
+  sed -n '1,80p' "$WINDOW_LOG" >&2 || true
+  exit 1
+fi
+
+printf '%s\n' "$new_address" > "$ADDRESS_STATE"
+hyprctl dispatch movetoworkspacesilent "$target_workspace,address:$new_address" >/dev/null 2>&1 || true
+
+if [ "$focus" -eq 1 ]; then
+  hyprctl dispatch workspace "$target_workspace" >/dev/null 2>&1 || true
+  hyprctl dispatch focuswindow "address:$new_address" >/dev/null 2>&1 || true
+else
+  hyprctl dispatch workspace "$base_workspace" >/dev/null 2>&1 || true
+fi

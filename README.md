@@ -18,9 +18,10 @@ layout by hand.
 +-------------+---------------------------+
 ```
 
-The tmux workspace also opens a second window named `opencode` in the
-repo root. That window starts OpenCode with repo-specific instructions
-and reads the current LeetCode problem context from `leetcode/.current/`.
+`make tmux` also opens a normal Ghostty OpenCode window outside tmux. If
+the LeetCode tmux terminal is on Hyprland workspace `N`, OpenCode is
+placed on workspace `N + 1` and reads the current LeetCode problem context
+from `leetcode/.current/`.
 
 ## Quick Start
 
@@ -69,8 +70,8 @@ to replace if you adapt this repo for another machine.
 4. Write your solution and save it.
 5. Press `<tmux-prefix> T` to run tests in the bottom-right pane.
 6. Press `<tmux-prefix> S` to submit the current solution.
-7. Switch to the `opencode` window when you want terminal help for the
-   current problem.
+7. Switch one workspace to the right, or run `make oc`, when you want
+   OpenCode help for the current problem.
 8. Press `<tmux-prefix> d` to detach when you are done.
 9. Run `make tmux` later to resume.
 
@@ -94,9 +95,9 @@ the generic binding shape and the maintainer-specific tmux config path.
 
 ## OpenCode Tutor
 
-`make tmux` ensures a second tmux window named `opencode`. That window
-runs `scripts/lc-opencode-pane`, a repo-scoped supervisor that opens
-OpenCode and restarts it if it exits.
+`make tmux` keeps tmux limited to the three LeetCode/Neovim/shell panes.
+OpenCode runs as a normal foreground TUI in a separate Ghostty window via
+`scripts/lc-opencode-window` and `scripts/lc-opencode`.
 
 The OpenCode tutor uses:
 
@@ -107,9 +108,9 @@ The OpenCode tutor uses:
   for the current problem
 
 The OpenCode session title follows `leetcode/.current/topic-slug`, so a
-problem tagged `linked-list` opens or reuses the `linked-list` chat. If
-the topic changes while the tutor is open, the supervisor closes the old
-OpenCode process and reopens the matching topic session.
+problem tagged `linked-list` opens or reuses the `linked-list` chat. The
+external watcher closes/reopens the Ghostty OpenCode window when that
+topic changes. It never backgrounds OpenCode inside its own terminal.
 
 The default model is:
 
@@ -117,8 +118,8 @@ The default model is:
 opencode-go/deepseek-v4-flash
 ```
 
-If that model is unavailable during first session setup, or the primary
-OpenCode process exits with an error, the launcher falls back to:
+If that model is unavailable during first session setup, the launcher
+falls back to:
 
 ```text
 opencode/deepseek-v4-flash-free
@@ -130,10 +131,17 @@ To use another model for one run:
 LC_OPENCODE_MODEL=<provider/model> make tmux
 ```
 
-The launcher sets `TMPDIR` only for its own OpenCode child process, using
+To focus or reopen the tutor directly:
+
+```bash
+make oc
+```
+
+The launcher sets `TMPDIR` only for its own OpenCode process, using
 repo-local `.cache/tmp`. It does not edit global OpenCode config, shell
 aliases, or dotfiles, so normal OpenCode use outside this repo is left
-alone.
+alone. Repo OpenCode mouse support is enabled; use Shift-drag when you
+want terminal-level selection in a mouse-aware TUI.
 
 ## Maintainer Defaults
 
@@ -147,6 +155,7 @@ This repo is currently tuned for the maintainer's local setup:
 | tmux session | `dsa-ml-practice` |
 | tmux prefix | `C-a` |
 | dotfiles source | `~/dotfiles` |
+| tmux left pane width | `45%` |
 | OpenCode default model | `opencode-go/deepseek-v4-flash` |
 | OpenCode fallback model | `opencode/deepseek-v4-flash-free` |
 

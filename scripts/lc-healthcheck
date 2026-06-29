@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lc-healthcheck
 # ------------------------------------------------------------------------------
-# Fast repo workflow checks for the tmux LeetCode/OpenCode setup.
+# Fast repo workflow checks for the LeetCode tmux and external OpenCode setup.
 # ------------------------------------------------------------------------------
 set -euo pipefail
 
@@ -24,20 +24,25 @@ check() {
 
 check "leetcode command is installed" command -v leetcode
 check "opencode command is installed" command -v opencode
+check "ghostty command is installed" command -v ghostty
 check "nvim command is installed" command -v nvim
 check "repo nvim wrapper is executable" test -x "$ROOT/scripts/lc-nvim"
+check "repo OpenCode launcher is executable" test -x "$ROOT/scripts/lc-opencode"
+check "repo OpenCode terminal wrapper is executable" test -x "$ROOT/scripts/lc-opencode-terminal"
+check "repo OpenCode window launcher is executable" test -x "$ROOT/scripts/lc-opencode-window"
+check "repo OpenCode topic watcher is executable" test -x "$ROOT/scripts/lc-opencode-watch"
 
 mkdir -p "$WORKDIR" "$ROOT/.cache/tmp"
 
 check "repo-local tmpdir is writable" test -w "$ROOT/.cache/tmp"
 check "repo OpenCode TUI config exists" test -f "$ROOT/.opencode/tui.json"
-check "repo OpenCode mouse capture is disabled" node -e "const cfg=require(process.argv[1]); process.exit(cfg.mouse === false ? 0 : 1)" "$ROOT/.opencode/tui.json"
+check "repo OpenCode mouse support is enabled" node -e "const cfg=require(process.argv[1]); process.exit(cfg.mouse === true ? 0 : 1)" "$ROOT/.opencode/tui.json"
 check "leetcode workspace is configured" leetcode workspace current
 check "leetcode credentials are valid" leetcode whoami
 check "opencode can read models" opencode models
 
 if opencode mcp list 2>/dev/null | grep -q 'alphaxiv .*needs authentication'; then
-  printf 'warn: alphaxiv MCP needs authentication; repo tmux disables it for OpenCode startup\n' >&2
+  printf 'warn: alphaxiv MCP needs authentication; repo OpenCode launcher disables it for startup\n' >&2
 fi
 
 if [ "$ok" -eq 1 ]; then

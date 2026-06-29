@@ -63,7 +63,7 @@ tmux send-keys -t "${target}.2" "\"$SCRIPTS/lc-nvim\"" C-m
 # commands in the same pane.
 tmux split-window -v -t "${target}.2" -c "$WORKDIR"
 window_width="$(tmux display-message -p -t "$target" '#{window_width}')"
-left_width=$((window_width * 35 / 100))
+left_width=$(((window_width * 45 + 50) / 100))
 tmux resize-pane -t "${target}.1" -x "$left_width"
 tmux resize-pane -t "${target}.3" -y 25%
 tmux send-keys -t "${target}.3" "$SCRIPTS/lc-watch &" C-m

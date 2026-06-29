@@ -26,9 +26,7 @@ to change if you adapt the repo for another machine.
 
 ## Mental Model
 
-The default workspace has two tmux windows.
-
-Window 1 is the problem workspace. It has three panes:
+The default tmux workspace has one problem window with three panes:
 
 ```text
 +-------------+---------------------------+
@@ -41,14 +39,10 @@ Window 1 is the problem workspace. It has three panes:
 +-------------+---------------------------+
 ```
 
-Window 2 is named:
-
-```text
-opencode
-```
-
-It has one pane, starts in `<repo-dir>`, and runs the repo OpenCode
-tutor launcher.
+OpenCode is not run inside tmux. `make tmux` opens or reuses a normal
+Ghostty OpenCode window on the Hyprland workspace immediately to the
+right of the terminal where you launched tmux. If LeetCode tmux starts on
+workspace `N`, OpenCode goes to workspace `N + 1`.
 
 The left pane is for choosing problems. The top-right pane is for
 editing code. The bottom-right pane is for commands and output.
@@ -64,6 +58,8 @@ The workflow glue is:
 - `<tmux-prefix> T` and `<tmux-prefix> S` run test/submit against that
   exact current file.
 - the OpenCode tutor reads `<workdir>/.current/` when you ask for help.
+- `lc-opencode-watch` watches the topic slug and refreshes the external
+  Ghostty OpenCode window when the topic changes.
 
 That last point matters. The workflow targets the current file path, not
 just the problem number. That prevents old numbered attempts from being
@@ -204,11 +200,12 @@ script first.
 1. ensures the `<session-name>` tmux session exists
 2. creates the standard 3-pane layout if needed
 3. repairs a stale or half-restored first window when it can
-4. ensures the second window is named `opencode`
+4. removes any stale old tmux tutor window from previous workflow versions
 5. starts the file watcher in the bottom-right pane if missing
-6. starts OpenCode in the repo root if the `opencode` window is idle
-7. attaches from a normal terminal
-8. switches clients if you are already inside another tmux session
+6. opens or reuses external Ghostty OpenCode on workspace `N + 1`
+7. starts the external topic watcher if missing
+8. attaches from a normal terminal
+9. switches clients if you are already inside another tmux session
 
 Manual attach is possible if the session already exists:
 
@@ -238,7 +235,6 @@ Use your own tmux prefix in place of `<tmux-prefix>`.
 | `<tmux-prefix> p` | previous window |
 | `<tmux-prefix> w` | list windows |
 | `<tmux-prefix> 1` | go to the first problem window |
-| `<tmux-prefix> 2` | go to the OpenCode tutor window |
 | `<tmux-prefix> d` | detach |
 | `<tmux-prefix> [` | enter tmux copy-mode |
 | `q` or `Esc` | leave tmux copy-mode |
@@ -265,14 +261,15 @@ If you install `tmux-resurrect`, its default manual save binding is:
 6. Press `<tmux-prefix> T`.
 7. Read test output in the bottom-right pane.
 8. If tests pass, press `<tmux-prefix> S`.
-9. Use the `opencode` window when you want help with the current
-   problem.
+9. Use the Ghostty OpenCode window on the workspace to the right when you
+   want help with the current problem. Run `make oc` to focus or reopen it.
 10. Detach with `<tmux-prefix> d` when done.
 
 ## OpenCode Tutor Window
 
-The `opencode` window is for asking about the current LeetCode problem
-without copying the statement by hand.
+The OpenCode tutor is a normal Ghostty window, not a tmux pane. This keeps
+OpenCode's keyboard, mouse, scrolling, selection, and TUI state separate
+from tmux.
 
 The repo provides:
 
@@ -281,7 +278,9 @@ AGENTS.md
 .skills/leetcode-dsa-teach/SKILL.md
 .opencode/dsa-prompt.md
 .opencode/config.env
-scripts/lc-opencode-pane
+scripts/lc-opencode
+scripts/lc-opencode-window
+scripts/lc-opencode-watch
 ```
 
 `AGENTS.md` tells OpenCode to read the latest files under:
@@ -333,7 +332,7 @@ matches the viewed problem.
 
 ### Asking For Help
 
-In the `opencode` window, ask normally:
+In the external Ghostty OpenCode window, ask normally:
 
 ```text
 explain the current problem
@@ -348,7 +347,7 @@ current solution path when those requests need problem or code context.
 
 ### Session Titles
 
-When `scripts/lc-opencode-pane` starts, it reads:
+When `scripts/lc-opencode` starts, it reads:
 
 ```text
 <workdir>/.current/topic-slug
@@ -365,22 +364,24 @@ dynamic-programming
 If a session with the same title and repo directory already exists,
 OpenCode reuses it. If not, the launcher creates one.
 
-The launcher keeps watching `<workdir>/.current/topic-slug`. If you
-browse to a problem whose first topic slug is different, it closes the
-current OpenCode TUI and reopens the matching topic chat. If the new
-problem has the same first topic slug, the same OpenCode chat stays open.
+The separate `scripts/lc-opencode-watch` process watches
+`<workdir>/.current/topic-slug`. If you browse to a problem whose first
+topic slug is different, it closes the current external OpenCode Ghostty
+window and reopens the matching topic chat. If the new problem has the
+same first topic slug, the same OpenCode chat stays open.
 
 The chat session is per topic, not per problem. For example, two
 different linked-list problems use the same `linked-list` OpenCode
 session.
 
-You normally do not run the launcher by hand. `make tmux` creates or
-repairs the window. If you are already inside the `opencode` window and
-need to restart the supervisor manually, run:
+You normally do not run the raw launcher by hand. Use:
 
 ```bash
-scripts/lc-opencode-pane
+make oc
 ```
+
+That focuses or reopens the external Ghostty OpenCode window for the
+current topic.
 
 ### Models
 
@@ -390,7 +391,7 @@ Default model:
 opencode-go/deepseek-v4-flash
 ```
 
-Fallback model for first-session setup and primary-process errors:
+Fallback model for first-session setup:
 
 ```text
 opencode/deepseek-v4-flash-free
@@ -403,17 +404,18 @@ The defaults live in:
 ```
 
 The launcher asks OpenCode's database for the exact matching topic title
-and repo directory. It does not delete, cap, or limit your sessions.
+and repo directory. It does not delete, cap, or limit your OpenCode
+sessions.
 
-Temporary OpenCode seed logs go to a repo-local cache directory at
+Temporary OpenCode seed logs and watcher state go to a repo-local cache directory at
 `<repo-dir>/.cache/opencode`, and are removed after successful startup.
 OpenCode temp files for this launcher use `<repo-dir>/.cache/tmp`. The
 `.cache/` directory is ignored by git.
 
 This customization is scoped to this repo launcher. It exports `TMPDIR`
-only for the OpenCode child process it starts. It does not edit global
-OpenCode config, shell aliases, zsh config, tmux config, or dotfiles.
-Normal OpenCode use outside this workflow is left alone.
+only for the OpenCode process it starts. It does not edit global OpenCode
+config, shell aliases, zsh config, tmux config, or dotfiles. Normal
+OpenCode use outside this workflow is left alone.
 
 For a one-off model swap:
 
@@ -421,21 +423,29 @@ For a one-off model swap:
 LC_OPENCODE_MODEL=<provider/model> make tmux
 ```
 
-or from inside the `opencode` window:
+or directly:
 
 ```bash
-LC_OPENCODE_MODEL=<provider/model> scripts/lc-opencode-pane
+LC_OPENCODE_MODEL=<provider/model> make oc
 ```
+
+### Mouse And Selection
+
+Repo OpenCode mouse support is enabled. The mouse wheel should scroll the
+OpenCode chat instead of walking prompt history.
+
+Because OpenCode is a mouse-aware terminal TUI, unmodified drag events go
+to OpenCode. For terminal-level selection and Ghostty copy-on-select, use
+Shift-drag.
 
 ### If OpenCode Is Not Installed
 
-The LeetCode workflow still works. The `opencode` window prints that
-`opencode` is missing and drops to a shell. Install the OpenCode CLI for
-your system, then run:
+The LeetCode workflow still works. The external tutor window is skipped.
+Install the OpenCode CLI for your system, then run:
 
 ```bash
 cd <repo-dir>
-scripts/lc-opencode-pane
+make oc
 ```
 
 ## Next Day: Continue The Same Solution
@@ -568,7 +578,7 @@ That new window gets the same three panes:
 Pick a different problem in the new window by pressing `p` in that
 window's left pane.
 
-There is one shared `opencode` tutor window. It follows the latest
+There is one shared external OpenCode tutor window. It follows the latest
 problem context written to `<workdir>/.current/`. If you are working on
 several problem windows, open or pick the problem you want help with
 before asking OpenCode.
@@ -580,7 +590,6 @@ Switch windows with:
 <tmux-prefix> p      previous window
 <tmux-prefix> w      window list
 <tmux-prefix> 1      window 1
-<tmux-prefix> 2      window 2
 ```
 
 ## Saving And Restoring Windows
@@ -700,6 +709,7 @@ examples, not public requirements.
 | tmux prefix | `C-a` |
 | dotfiles source | `~/dotfiles` |
 | tmux config source | `~/dotfiles/tmux/.tmux.conf` |
+| tmux left pane width | `45%` |
 | OpenCode default model | `opencode-go/deepseek-v4-flash` |
 | OpenCode fallback model | `opencode/deepseek-v4-flash-free` |
 
@@ -716,7 +726,6 @@ Maintainer key examples:
 C-a T      test current solution
 C-a S      submit current solution
 C-a c      create another practice window
-C-a 2      go to OpenCode tutor window
 C-a d      detach
 C-a C-s    save tmux-resurrect state
 ```
@@ -739,7 +748,8 @@ set -g @plugin 'christoomey/vim-tmux-navigator'
 - Treat numbered files as archived attempts.
 - Save in Neovim before testing.
 - Use `<tmux-prefix> T` for test and `<tmux-prefix> S` for submit.
-- Use the `opencode` window for current-problem teaching and debugging.
+- Use the external Ghostty OpenCode window for current-problem teaching
+  and debugging.
 - If using tmux restore plugins, save with `<tmux-prefix> C-s` before
   shutdown.
 - Use `make tmux` after reboot instead of direct `tmux attach`.
@@ -828,19 +838,18 @@ solution path.
 
 ### I want the OpenCode chat title to match the latest topic
 
-You should not need to do anything manually. The `opencode` window
-supervisor watches:
+You should not need to do anything manually. The external watcher watches:
 
 ```text
 <workdir>/.current/topic-slug
 ```
 
-When that file changes to a new topic slug, the supervisor closes the
-current OpenCode TUI and reopens the existing matching session, creating
-one only when needed.
+When that file changes to a new topic slug, the watcher closes the
+current external Ghostty OpenCode window and reopens the existing
+matching session, creating one only when needed.
 
-If the `opencode` window is missing or idle, run `make tmux` from
-`<repo-dir>` to repair it.
+If the OpenCode window is missing or idle, run `make oc` from
+`<repo-dir>` to focus or reopen it.
 
 ### I want to inspect old attempts
 
@@ -863,6 +872,7 @@ make config    point CLI workspace at this repo
 make login     log in to LeetCode
 make whoami    check login status
 make tmux      open or resume the practice workspace
+make oc        focus/open the external OpenCode tutor
 make venv      create/sync Python env
 make ml        install optional ML dependencies
 make clean     clear caches
@@ -875,7 +885,7 @@ This workflow is intentionally narrow:
 
 - one named tmux session
 - one standard problem layout
-- one repo-root OpenCode tutor window
+- one repo-root external Ghostty OpenCode tutor window
 - one active solution path
 - no manual pane setup
 - no guessing which numbered file to test
