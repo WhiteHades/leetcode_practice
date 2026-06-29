@@ -117,7 +117,7 @@ setup_window() {
 
   start_leetcode "${target}.1"
   tmux split-window -h -p 65 -t "${target}.1" -c "$WORKDIR"
-  tmux send-keys -t "${target}.2" 'nvim' C-m
+  tmux send-keys -t "${target}.2" "\"$SCRIPTS/lc-nvim\"" C-m
   tmux split-window -v -t "${target}.2" -c "$WORKDIR"
   apply_layout "$target"
   start_watcher "${target}.3"
@@ -210,7 +210,7 @@ repair_window() {
 
   if [ "$cmd2" != "nvim" ]; then
     is_shell "$cmd2" || return 1
-    tmux send-keys -t "${window}.2" 'nvim' C-m
+    tmux send-keys -t "${window}.2" "\"$SCRIPTS/lc-nvim\"" C-m
   fi
 
   is_shell "$cmd3" || return 1

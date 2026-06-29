@@ -54,7 +54,7 @@ start_leetcode "${target}.1"
 
 # Pane 2: top-right nvim.
 tmux split-window -h -p 65 -t "${target}.1" -c "$WORKDIR"
-tmux send-keys -t "${target}.2" 'nvim' C-m
+tmux send-keys -t "${target}.2" "\"$SCRIPTS/lc-nvim\"" C-m
 
 # Pane 3: bottom-right shell running the watcher in the background
 # (which auto-opens newly picked .py files in pane 2 and writes the

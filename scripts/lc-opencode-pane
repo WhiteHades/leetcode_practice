@@ -13,6 +13,7 @@ WORKDIR="${LC_WORKDIR:-$ROOT/leetcode}"
 CURRENT_DIR="$WORKDIR/.current"
 CONFIG_FILE="$ROOT/.opencode/config.env"
 PROMPT_FILE="$ROOT/.opencode/dsa-prompt.md"
+TUI_CONFIG_FILE="$ROOT/.opencode/tui.json"
 CACHE_DIR="${LC_CACHE_DIR:-$ROOT/.cache}"
 TMP_ROOT="${LC_TMPDIR:-$CACHE_DIR/tmp}"
 LOG_DIR="${LC_OPENCODE_LOG_DIR:-$CACHE_DIR/opencode}"
@@ -22,6 +23,10 @@ export TMPDIR="$TMP_ROOT"
 
 if [ -z "${OPENCODE_CONFIG_CONTENT:-}" ]; then
   export OPENCODE_CONFIG_CONTENT='{"mcp":{"alphaxiv":{"enabled":false}}}'
+fi
+
+if [ -z "${OPENCODE_TUI_CONFIG:-}" ] && [ -f "$TUI_CONFIG_FILE" ]; then
+  export OPENCODE_TUI_CONFIG="$TUI_CONFIG_FILE"
 fi
 
 opencode_pid=""

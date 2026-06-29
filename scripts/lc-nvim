@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# lc-nvim
+# ------------------------------------------------------------------------------
+# Repo-local Neovim launcher for the tmux practice workflow. It disables swap
+# files only for this workflow; normal `nvim` elsewhere is untouched.
+# ------------------------------------------------------------------------------
+set -euo pipefail
+
+exec nvim -n "$@"
