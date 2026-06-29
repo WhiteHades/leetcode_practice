@@ -21,6 +21,8 @@ set -euo pipefail
 WORKDIR="$HOME/Codes/dsa-ml-practice/leetcode"
 SCRIPTS="$HOME/Codes/dsa-ml-practice/scripts"
 SESSION="dsa-ml-practice"
+MIN_COLS=120
+MIN_ROWS=35
 
 leetcode_ready() {
   command -v leetcode >/dev/null 2>&1 && leetcode whoami >/dev/null 2>&1
@@ -37,23 +39,145 @@ start_leetcode() {
   tmux send-keys -t "$pane" "cd \"$HOME/Codes/dsa-ml-practice\" && \"$SCRIPTS/lc-healthcheck\"; leetcode login" C-m
 }
 
-# tmux runs the after-new-window hook in a fresh shell where $TMUX_PANE is
-# NOT set to the new window's pane (it points to the calling pane instead).
-# The new window is, however, the active window at hook-fire time, so we
-# read the current window id directly from tmux. If we are somehow not
-# inside tmux, exit cleanly.
+start_watcher() {
+  local pane="$1"
+  local pane_id window_id lock_dir lock_pid
+
+  pane_id="$(tmux display-message -p -t "$pane" '#{pane_id}')"
+  window_id="$(tmux display-message -p -t "$pane" '#{window_id}')"
+  lock_dir="$WORKDIR/.current/lc-watch-${window_id}.lock"
+  lock_pid="$(cat "$lock_dir/pid" 2>/dev/null || true)"
+
+  if [ -n "$lock_pid" ] && kill -0 "$lock_pid" 2>/dev/null; then
+    return 0
+  fi
+
+  rm -rf "$lock_dir"
+  nohup env TMUX_PANE="$pane_id" "$SCRIPTS/lc-watch" >/dev/null 2>&1 &
+}
+
+# tmux passes the new window id from the after-new-window hook. Guessing with
+# display-message is unsafe for detached new-window calls because it can return
+# the previously active window and split it again.
 if [ -z "${TMUX:-}" ]; then
   exit 0
 fi
 
-window_id="$(tmux display-message -p '#{window_id}')"
+tmux set-window-option -t "$SESSION" window-size latest >/dev/null 2>&1 || true
+
+terminal_cols() {
+  local cols=""
+
+  if [ -n "${TMUX:-}" ]; then
+    cols="$(tmux display-message -p '#{window_width}' 2>/dev/null || true)"
+  elif [ -t 1 ] && command -v tput >/dev/null 2>&1; then
+    cols="$(tput cols 2>/dev/null || true)"
+  fi
+
+  case "$cols" in
+    ''|*[!0-9]*) cols="$MIN_COLS" ;;
+  esac
+
+  if [ "$cols" -lt "$MIN_COLS" ]; then
+    cols="$MIN_COLS"
+  fi
+
+  printf '%s\n' "$cols"
+}
+
+terminal_rows() {
+  local rows=""
+
+  if [ -n "${TMUX:-}" ]; then
+    rows="$(tmux display-message -p '#{window_height}' 2>/dev/null || true)"
+  elif [ -t 1 ] && command -v tput >/dev/null 2>&1; then
+    rows="$(tput lines 2>/dev/null || true)"
+  fi
+
+  case "$rows" in
+    ''|*[!0-9]*) rows="$MIN_ROWS" ;;
+  esac
+
+  if [ "$rows" -lt "$MIN_ROWS" ]; then
+    rows="$MIN_ROWS"
+  fi
+
+  printf '%s\n' "$rows"
+}
+
+session_has_clients() {
+  [ -n "$(tmux list-clients -t "$SESSION" 2>/dev/null || true)" ]
+}
+
+client_cols() {
+  local cols=0 width height
+
+  while read -r width height; do
+    case "$width:$height" in
+      *[!0-9:]*|:*|*:|*::*) continue ;;
+    esac
+    [ "$width" -gt "$cols" ] && cols="$width"
+  done < <(tmux list-clients -t "$SESSION" -F '#{client_width} #{client_height}' 2>/dev/null)
+
+  [ "$cols" -gt 0 ] || cols="$(terminal_cols)"
+  printf '%s\n' "$cols"
+}
+
+client_rows() {
+  local rows=0 width height
+
+  while read -r width height; do
+    case "$width:$height" in
+      *[!0-9:]*|:*|*:|*::*) continue ;;
+    esac
+    [ "$height" -gt "$rows" ] && rows="$height"
+  done < <(tmux list-clients -t "$SESSION" -F '#{client_width} #{client_height}' 2>/dev/null)
+
+  if [ "$rows" -gt 1 ]; then
+    rows=$((rows - 1))
+  else
+    rows="$(terminal_rows)"
+  fi
+
+  printf '%s\n' "$rows"
+}
+
+prepare_window_size() {
+  local target="$1"
+
+  tmux set-window-option -t "$target" window-size latest >/dev/null 2>&1 || true
+
+  if ! session_has_clients; then
+    tmux resize-window -t "$target" -x "$(terminal_cols)" -y "$(terminal_rows)" >/dev/null 2>&1 || true
+    tmux set-window-option -t "$target" window-size latest >/dev/null 2>&1 || true
+    return 0
+  fi
+
+  tmux resize-window -t "$target" -x "$(client_cols)" -y "$(client_rows)" >/dev/null 2>&1 || true
+  tmux set-window-option -t "$target" window-size latest >/dev/null 2>&1 || true
+}
+
+window_id="${1:-}"
+if [ -z "$window_id" ]; then
+  window_id="$(tmux display-message -p '#{window_id}')"
+fi
 target="${SESSION}:${window_id}"
+
+if ! tmux display-message -p -t "$target" '#{window_id}' >/dev/null 2>&1; then
+  exit 0
+fi
+
+if [ "$(tmux list-panes -t "$target" 2>/dev/null | wc -l)" -ne 1 ]; then
+  exit 0
+fi
+
+prepare_window_size "$target"
 
 # Pane 1 is the new-window's initial pane. Re-purpose it as the TUI pane.
 start_leetcode "${target}.1"
 
 # Pane 2: top-right nvim.
-tmux split-window -h -p 65 -t "${target}.1" -c "$WORKDIR"
+tmux split-window -h -p 55 -t "${target}.1" -c "$WORKDIR"
 tmux send-keys -t "${target}.2" "\"$SCRIPTS/lc-nvim\"" C-m
 
 # Pane 3: bottom-right shell running the watcher in the background
@@ -61,14 +185,12 @@ tmux send-keys -t "${target}.2" "\"$SCRIPTS/lc-nvim\"" C-m
 # current id to a sentinel for the C-a T / C-a S keybinds). The watcher
 # must run in the background so the shell is free to run test/submit
 # commands in the same pane.
-tmux split-window -v -t "${target}.2" -c "$WORKDIR"
+tmux split-window -v -p 25 -t "${target}.2" -c "$WORKDIR"
 window_width="$(tmux display-message -p -t "$target" '#{window_width}')"
 left_width=$(((window_width * 45 + 50) / 100))
 tmux resize-pane -t "${target}.1" -x "$left_width"
 tmux resize-pane -t "${target}.3" -y 25%
-tmux send-keys -t "${target}.3" "$SCRIPTS/lc-watch &" C-m
-tmux send-keys -t "${target}.3" "disown" C-m
-tmux send-keys -t "${target}.3" "clear" C-m
+start_watcher "${target}.3"
 
 # Land the user on the TUI pane so they can browse.
 tmux select-pane -t "${target}.1"

@@ -33,6 +33,20 @@ fi
 
 window_id="$(tmux display-message -p -t "$my_pane" '#{window_id}')"
 nvim_pane="${window_id}.2"
+LOCK_DIR="$WORKDIR/.current/lc-watch-${window_id}.lock"
+
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  old_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+  if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+    exit 0
+  fi
+
+  rm -rf "$LOCK_DIR"
+  mkdir "$LOCK_DIR"
+fi
+
+printf '%s\n' "$$" > "$LOCK_DIR/pid"
+trap 'rm -rf "$LOCK_DIR"' EXIT
 
 # Extract the leading problem id from "<id>.<slug>.<ext>" e.g. 1.two-sum.py
 extract_id() {
@@ -66,7 +80,14 @@ path.write_text("\n".join(lines[: i + 1] + [f"{indent}pass"]) + "\n")
 PY
 }
 
-inotifywait -m -r "$WORKDIR" -e create -e moved_to --format '%w%f' | \
+tmux_target_exists() {
+  [ -n "$(tmux display-message -p -t "$1" '#{pane_id}' 2>/dev/null || true)" ]
+}
+
+while tmux_target_exists "$my_pane" && tmux_target_exists "$nvim_pane"; do
+  events="$(inotifywait -q -r "$WORKDIR" -e create -e moved_to --format '%w%f' -t 2 2>/dev/null || true)"
+  [ -n "$events" ] || continue
+
   while read -r path; do
     case "$path" in
       *.py)
@@ -80,4 +101,5 @@ inotifywait -m -r "$WORKDIR" -e create -e moved_to --format '%w%f' | \
         tmux send-keys -t "$nvim_pane" ":edit $(escape_vim_path "$path")" C-m
         ;;
     esac
-  done
+  done <<< "$events"
+done
