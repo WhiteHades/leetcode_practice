@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
 # lc-ensure-session
 # ------------------------------------------------------------------------------
-# Creates or repairs the dsa-ml-practice tmux session before attaching.
-# It is intentionally conservative: if an existing managed window cannot be
-# repaired safely, it creates a fresh healthy window and renames stale windows
-# instead of killing unrelated user work.
+# Creates or repairs the leetcode_practice tmux session before attaching.
+# It repairs the managed window when possible. If it has to create a fresh one,
+# it removes workflow-generated stale windows so the tmux UI stays uncluttered.
 # ------------------------------------------------------------------------------
 set -euo pipefail
 
-ROOT="$HOME/Codes/dsa-ml-practice"
+ROOT="${LC_REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 WORKDIR="$ROOT/leetcode"
 SCRIPTS="$ROOT/scripts"
-SESSION="dsa-ml-practice"
+SESSION="leetcode_practice"
 MIN_COLS=120
 MIN_ROWS=35
-PROBLEM_ROLE="leetcode-problems"
+PROBLEM_ROLE="leetcode_problems"
 
 mkdir -p "$WORKDIR"
 
 leetcode_ready() {
-  command -v leetcode >/dev/null 2>&1 && leetcode whoami >/dev/null 2>&1
+  local output
+
+  output="$(NO_COLOR=1 leetcode whoami 2>&1)" || return 1
+  printf '%s\n' "$output" | grep -Fq 'Logged in as'
 }
 
 start_leetcode() {
@@ -347,8 +349,9 @@ remove_tmux_opencode_windows() {
 
   while read -r window window_name; do
     [ -n "$window" ] || continue
-    [ "$window_name" = "opencode" ] || continue
-    tmux rename-window -t "$SESSION:$window" "opencode-stale-${window#@}" 2>/dev/null || true
+    case "$window_name" in
+      opencode|opencode-stale-*) tmux kill-window -t "$SESSION:$window" 2>/dev/null || true ;;
+    esac
   done < <(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name}' 2>/dev/null)
 }
 
@@ -360,20 +363,28 @@ remove_stale_problem_windows() {
     [ -n "$window_id" ] || continue
     [ "$window_id" != "$keep_window" ] || continue
 
+    case "$window_name" in
+      problems-stale-*)
+        tmux kill-window -t "$SESSION:$window_id" 2>/dev/null || true
+        continue
+        ;;
+    esac
+
     if [ "$window_role" = "$PROBLEM_ROLE" ]; then
-      tmux set-window-option -t "$SESSION:$window_id" -u @dsa-role >/dev/null 2>&1 || true
+      tmux kill-window -t "$SESSION:$window_id" 2>/dev/null || true
+      continue
     fi
 
     [ "$window_name" = "problems" ] || continue
-    tmux rename-window -t "$SESSION:$window_id" "problems-stale-${window_id#@}" 2>/dev/null || true
-  done < <(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name} #{@dsa-role}' 2>/dev/null)
+    tmux kill-window -t "$SESSION:$window_id" 2>/dev/null || true
+  done < <(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name} #{@leetcode_role}' 2>/dev/null)
 }
 
 mark_problem_window() {
   local target="$1"
 
   tmux rename-window -t "$target" problems 2>/dev/null || true
-  tmux set-window-option -t "$target" @dsa-role "$PROBLEM_ROLE" >/dev/null 2>&1 || true
+  tmux set-window-option -t "$target" @leetcode_role "$PROBLEM_ROLE" >/dev/null 2>&1 || true
   tmux set-window-option -t "$target" window-size latest >/dev/null 2>&1 || true
 }
 
@@ -395,21 +406,21 @@ find_problem_window() {
       printf '%s:%s\n' "$SESSION" "$window_id"
       return 0
     fi
-  done < <(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name} #{@dsa-role}' 2>/dev/null)
+  done < <(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name} #{@leetcode_role}' 2>/dev/null)
 
   while read -r window_id window_name window_role; do
     if [ "$window_role" = "$PROBLEM_ROLE" ]; then
       printf '%s:%s\n' "$SESSION" "$window_id"
       return 0
     fi
-  done < <(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name} #{@dsa-role}' 2>/dev/null)
+  done < <(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name} #{@leetcode_role}' 2>/dev/null)
 
   while read -r window_id window_name window_role; do
     if [ "$window_name" = "problems" ]; then
       printf '%s:%s\n' "$SESSION" "$window_id"
       return 0
     fi
-  done < <(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name} #{@dsa-role}' 2>/dev/null)
+  done < <(tmux list-windows -t "$SESSION" -F '#{window_id} #{window_name} #{@leetcode_role}' 2>/dev/null)
 
   if tmux display-message -p -t "$SESSION:1" '#{window_id}' >/dev/null 2>&1; then
     printf '%s:1\n' "$SESSION"

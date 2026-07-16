@@ -4,15 +4,15 @@ SHELL := /usr/bin/env bash
 ROOT    := $(CURDIR)
 UV      ?= uv
 NPM     ?= npm
-LEETCODE_CLI_SRC ?= ../leetcode-cli
-WORKDIR := $(HOME)/Codes/dsa-ml-practice/leetcode
-SESSION := dsa-ml-practice
+LEETCODE_CLI_SRC ?= $(HOME)/Codes/projects/leetcode-cli
+WORKDIR := $(ROOT)/leetcode
+SESSION := leetcode_practice
 SCRIPTS := $(ROOT)/scripts
 
-.PHONY: help setup venv ml install config login whoami tmux oc clean repl
+.PHONY: help setup venv install config login whoami tmux oc clean repl
 
 help:
-	@printf '%s\n' 'dsa-ml-practice'
+	@printf '%s\n' 'leetcode_practice'
 	@printf '%s\n' ''
 	@printf '%s\n' '  make setup     install CLI, build/link, configure workspace'
 	@printf '%s\n' '  make install    build/link the LeetCode CLI fork into PATH'
@@ -22,7 +22,6 @@ help:
 	@printf '%s\n' '  make tmux       open or resume the tmux practice workspace'
 	@printf '%s\n' '  make oc         focus/open the OpenCode tutor window'
 	@printf '%s\n' '  make venv       create/sync Python env'
-	@printf '%s\n' '  make ml         install future ML basics'
 	@printf '%s\n' '  make clean      clear cache dirs'
 	@printf '%s\n' '  make repl       launch ipython in this venv'
 
@@ -30,9 +29,6 @@ setup: install config
 
 venv:
 	$(UV) sync
-
-ml:
-	$(UV) sync --extra ml
 
 install:
 	cd "$(LEETCODE_CLI_SRC)" && $(NPM) install && $(NPM) run build && $(NPM) link

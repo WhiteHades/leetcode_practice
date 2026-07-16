@@ -7,7 +7,9 @@
 # ------------------------------------------------------------------------------
 set -euo pipefail
 
-SENTINEL="$HOME/Codes/dsa-ml-practice/leetcode/.current/id"
+ROOT="${LC_REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+WORKDIR="${LC_WORKDIR:-$ROOT/leetcode}"
+SENTINEL="$WORKDIR/.current/id"
 
 if [ ! -f "$SENTINEL" ]; then
   echo "no current problem sentinel at $SENTINEL" >&2

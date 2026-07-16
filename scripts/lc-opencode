@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # lc-opencode
 # ------------------------------------------------------------------------------
-# Runs plain foreground OpenCode for the current DSA topic. This intentionally
+# Runs plain foreground OpenCode for the current LeetCode topic. This intentionally
 # does not supervise or background the TUI; OpenCode owns its Ghostty TTY.
 # ------------------------------------------------------------------------------
 set -euo pipefail
 
-ROOT="${LC_REPO_ROOT:-$HOME/Codes/dsa-ml-practice}"
+ROOT="${LC_REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 WORKDIR="${LC_WORKDIR:-$ROOT/leetcode}"
 CURRENT_DIR="$WORKDIR/.current"
 CONFIG_FILE="$ROOT/.opencode/config.env"
@@ -70,7 +70,7 @@ current_session_title() {
 
   title="$(printf '%s' "$raw_title" | sanitize_title)"
   if [ -z "$title" ]; then
-    title="dsa-practice"
+    title="leetcode_practice"
   fi
 
   printf '%s\n' "$title"
@@ -130,7 +130,7 @@ seed_prompt() {
 
   cat <<EOF
 Initialize this OpenCode topic session named "$title".
-Read AGENTS.md and the repo-local DSA teach skill before helping.
+Read AGENTS.md and the repo-local LeetCode DSA teach skill before helping.
 Do not solve anything yet. Reply with READY.
 EOF
 }

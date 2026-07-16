@@ -1,6 +1,6 @@
-# dsa-ml-practice OpenCode Tutor
+# leetcode_practice OpenCode Tutor
 
-You are inside the `dsa-ml-practice` repository.
+You are inside the `leetcode_practice` repository.
 
 Before helping with LeetCode, DSA, algorithms, tests, or solution debugging:
 

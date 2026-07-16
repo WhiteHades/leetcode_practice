@@ -2,7 +2,7 @@
 
 Read this file before every task. Working code only. Finish the job. Plausibility is not correctness.
 
-This repo is a terminal-first LeetCode and DSA practice workspace. The normal workflow is tmux plus
+This repo is a terminal-first LeetCode practice workspace. The normal workflow is tmux plus
 LeetCode CLI plus Neovim plus an OpenCode tutor window.
 
 ## Repo-Specific Rules
@@ -87,8 +87,8 @@ Use the repo scripts instead of hand-built tmux layouts:
 make tmux
 ```
 
-The default session is `dsa-ml-practice`. The first window is the problem workflow. The second window
-is `opencode`.
+The default session is `leetcode_practice`. The tmux window is the problem workflow, while OpenCode
+runs in a separate Ghostty window.
 
 The LeetCode-specific tmux bindings are tmux bindings, not Neovim bindings:
 

@@ -5,7 +5,7 @@
 # ------------------------------------------------------------------------------
 set -euo pipefail
 
-ROOT="${LC_REPO_ROOT:-$HOME/Codes/dsa-ml-practice}"
+ROOT="${LC_REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 WORKDIR="${LC_WORKDIR:-$ROOT/leetcode}"
 
 ok=1
@@ -23,8 +23,8 @@ check() {
 }
 
 check_tmux_layout() {
-  local session="dsa-ml-practice"
-  local problem_role="leetcode-problems"
+  local session="leetcode_practice"
+  local problem_role="leetcode_problems"
   local width height saw_client=0 match_client=0
   local window_width window_height pane_count=0 pane
   local target="" window_id window_name window_role window_size_option
@@ -40,7 +40,7 @@ check_tmux_layout() {
       [ -n "$target" ] && continue
       target="$session:$window_id"
     fi
-  done < <(tmux list-windows -t "$session" -F '#{window_id} #{window_name} #{@dsa-role}' 2>/dev/null)
+  done < <(tmux list-windows -t "$session" -F '#{window_id} #{window_name} #{@leetcode_role}' 2>/dev/null)
 
   [ "$managed_count" -le 1 ] || return 1
 
@@ -79,7 +79,22 @@ check_tmux_layout() {
   [ "$match_client" -eq 1 ] || return 1
 }
 
-check "leetcode command is installed" command -v leetcode
+check_leetcode_workspace() {
+  local output
+
+  output="$(NO_COLOR=1 leetcode workspace current 2>/dev/null)" || return 1
+  printf '%s\n' "$output" | grep -Fq 'Active Workspace: leetcode_practice' || return 1
+  printf '%s\n' "$output" | grep -Fq "workDir:  $WORKDIR"
+}
+
+check_leetcode_credentials() {
+  local output
+
+  output="$(NO_COLOR=1 leetcode whoami 2>&1)" || return 1
+  printf '%s\n' "$output" | grep -Fq 'Logged in as'
+}
+
+check "leetcode command is working" leetcode --version
 check "opencode command is installed" command -v opencode
 check "ghostty command is installed" command -v ghostty
 check "nvim command is installed" command -v nvim
@@ -95,8 +110,8 @@ check "repo-local tmpdir is writable" test -w "$ROOT/.cache/tmp"
 check "repo OpenCode TUI config exists" test -f "$ROOT/.opencode/tui.json"
 check "repo OpenCode mouse support is enabled" node -e "const cfg=require(process.argv[1]); process.exit(cfg.mouse === true ? 0 : 1)" "$ROOT/.opencode/tui.json"
 check "tmux managed layout fills attached client" check_tmux_layout
-check "leetcode workspace is configured" leetcode workspace current
-check "leetcode credentials are valid" leetcode whoami
+check "leetcode workspace is configured" check_leetcode_workspace
+check "leetcode credentials are valid" check_leetcode_credentials
 check "opencode can read models" opencode models
 
 if opencode mcp list 2>/dev/null | grep -q 'alphaxiv .*needs authentication'; then

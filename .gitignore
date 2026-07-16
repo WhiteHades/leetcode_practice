@@ -12,7 +12,7 @@ __pycache__/
 
 # Generated leetcode-cli artifacts. These are personal work-in-progress
 # solutions, notes, and test data and must not leak into a public repo.
-# The CLI writes into ~/Codes/dsa-ml-practice/leetcode which is the
+# The CLI writes into this repository's leetcode directory, which is the
 # same path as this repo's `leetcode/` directory; .gitignore below
 # keeps the public tree clean.
 leetcode/**/*.py

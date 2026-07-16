@@ -2,7 +2,7 @@
 # lc-new-window
 # ------------------------------------------------------------------------------
 # Sets up the standard 3-pane layout inside any new tmux window that is
-# created inside the dsa-ml-practice session. Invoked automatically by the
+# created inside the leetcode_practice session. Invoked automatically by the
 # `after-new-window` tmux hook that `make tmux` registers.
 #
 # Standard layout (window = any new window name):
@@ -18,14 +18,18 @@
 # ------------------------------------------------------------------------------
 set -euo pipefail
 
-WORKDIR="$HOME/Codes/dsa-ml-practice/leetcode"
-SCRIPTS="$HOME/Codes/dsa-ml-practice/scripts"
-SESSION="dsa-ml-practice"
+ROOT="${LC_REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+WORKDIR="${LC_WORKDIR:-$ROOT/leetcode}"
+SCRIPTS="$ROOT/scripts"
+SESSION="leetcode_practice"
 MIN_COLS=120
 MIN_ROWS=35
 
 leetcode_ready() {
-  command -v leetcode >/dev/null 2>&1 && leetcode whoami >/dev/null 2>&1
+  local output
+
+  output="$(NO_COLOR=1 leetcode whoami 2>&1)" || return 1
+  printf '%s\n' "$output" | grep -Fq 'Logged in as'
 }
 
 start_leetcode() {
@@ -36,7 +40,7 @@ start_leetcode() {
     return 0
   fi
 
-  tmux send-keys -t "$pane" "cd \"$HOME/Codes/dsa-ml-practice\" && \"$SCRIPTS/lc-healthcheck\"; leetcode login" C-m
+  tmux send-keys -t "$pane" "cd \"$ROOT\" && \"$SCRIPTS/lc-healthcheck\"; leetcode login" C-m
 }
 
 start_watcher() {

@@ -1,6 +1,6 @@
-# Ruff config for the dsa-ml-practice repo.
-# This scopes ruff to the leetcode/ workdir (generated LeetCode
-# templates) and the ml/ practice dir. It silences E501 (line length)
+# Ruff config for the leetcode_practice repo.
+# This scopes ruff to the leetcode/ workdir and its generated LeetCode
+# templates. It silences E501 (line length)
 # because templates can be long, and E402 (module-level imports not
 # at top) because the template inserts a docstring before the import
 # block. LeetCode templates also rely on platform-provided names like

@@ -11,10 +11,11 @@
 # ------------------------------------------------------------------------------
 set -euo pipefail
 
-WORKDIR="$HOME/Codes/dsa-ml-practice/leetcode"
+ROOT="${LC_REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
+WORKDIR="${LC_WORKDIR:-$ROOT/leetcode}"
 ID_SENTINEL="$WORKDIR/.current/id"
 PATH_SENTINEL="$WORKDIR/.current/path"
-SESSION="dsa-ml-practice"
+SESSION="leetcode_practice"
 
 target="${1:-}"
 if [ -z "$target" ] && [ -f "$PATH_SENTINEL" ]; then

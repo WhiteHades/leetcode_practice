@@ -6,7 +6,7 @@
 # ------------------------------------------------------------------------------
 set -euo pipefail
 
-ROOT="${LC_REPO_ROOT:-$HOME/Codes/dsa-ml-practice}"
+ROOT="${LC_REPO_ROOT:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
 SCRIPTS="$ROOT/scripts"
 STATE_DIR="$ROOT/.cache/opencode"
 TOPIC_STATE="$STATE_DIR/window-topic"
@@ -98,8 +98,10 @@ if (value !== undefined && value !== null) process.stdout.write(String(value));
 ' "$field"
 }
 
+initial_workspace="$(active_workspace_id || true)"
+
 if [ -z "$base_workspace" ]; then
-  base_workspace="$(active_workspace_id)"
+  base_workspace="$initial_workspace"
 fi
 
 case "$base_workspace" in
@@ -107,8 +109,16 @@ case "$base_workspace" in
 esac
 
 target_workspace="${LC_OPENCODE_TARGET_WORKSPACE:-$((base_workspace + 1))}"
-window_title="DSA OpenCode | $current_topic"
-window_class="com.efaz.dsa-opencode"
+case "$target_workspace" in
+  ''|*[!0-9]*) target_workspace=$((base_workspace + 1)) ;;
+esac
+window_title="LeetCode OpenCode | $current_topic"
+window_class="dev.leetcode_practice.opencode"
+
+restore_initial_workspace() {
+  [ -n "$initial_workspace" ] || return 0
+  hyprctl dispatch workspace "$initial_workspace" >/dev/null 2>&1 || true
+}
 
 existing_address=""
 [ -f "$ADDRESS_STATE" ] && existing_address="$(sed -n '1p' "$ADDRESS_STATE" | tr -d '\r')"
@@ -127,7 +137,22 @@ existing_topic=""
 [ -f "$TOPIC_STATE" ] && existing_topic="$(sed -n '1p' "$TOPIC_STATE" | tr -d '\r')"
 
 launch_window() {
+  local command
+
   : > "$WINDOW_LOG"
+  printf -v command '%q ' \
+    ghostty \
+    --class="$window_class" \
+    --title="$window_title" \
+    --gtk-single-instance=false \
+    --working-directory="$ROOT" \
+    -e "$SCRIPTS/lc-opencode-terminal"
+  command="${command% }"
+
+  ghostty_pid=""
+  if hyprctl dispatch exec "[workspace $target_workspace silent] $command" >>"$WINDOW_LOG" 2>&1; then
+    return 0
+  fi
 
   ghostty \
     --class="$window_class" \
@@ -151,12 +176,12 @@ if [ -n "$existing_address" ]; then
       hyprctl dispatch workspace "$target_workspace" >/dev/null 2>&1 || true
       hyprctl dispatch focuswindow "address:$existing_address" >/dev/null 2>&1 || true
     else
-      hyprctl dispatch workspace "$base_workspace" >/dev/null 2>&1 || true
+      restore_initial_workspace
     fi
     exit 0
   fi
 
-  if [ -n "$existing_topic" ] && { [ "$existing_title" = "DSA OpenCode | $existing_topic" ] || [ "$existing_title" = "OC | $existing_topic" ] || [ "$existing_class" = "$window_class" ] || [ "$existing_initial_class" = "$window_class" ]; }; then
+  if [ -n "$existing_topic" ] && { [ "$existing_title" = "LeetCode OpenCode | $existing_topic" ] || [ "$existing_title" = "OC | $existing_topic" ] || [ "$existing_class" = "$window_class" ] || [ "$existing_initial_class" = "$window_class" ]; }; then
     hyprctl dispatch closewindow "address:$existing_address" >/dev/null 2>&1 || true
     rm -f "$ADDRESS_STATE"
     sleep 1
@@ -190,5 +215,5 @@ if [ "$focus" -eq 1 ]; then
   hyprctl dispatch workspace "$target_workspace" >/dev/null 2>&1 || true
   hyprctl dispatch focuswindow "address:$new_address" >/dev/null 2>&1 || true
 else
-  hyprctl dispatch workspace "$base_workspace" >/dev/null 2>&1 || true
+  restore_initial_workspace
 fi
