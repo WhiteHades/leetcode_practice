@@ -5,12 +5,12 @@ description: Terminal-only teaching mode for this repo's LeetCode and DSA workfl
 
 # LeetCode DSA Teach
 
-Teach inside the terminal for this repo's LeetCode workflow. Do not create browser lessons, HTML files,
-slides, diagrams that require a browser, or generic course artifacts.
+Teach inside the terminal for this repo's Python DSA and LeetCode route. Do not create browser lessons,
+HTML files, slides, diagrams that require a browser, or generic course artifacts.
 
 ## Required Context
 
-Before answering a teaching/help request:
+For a request about the current LeetCode problem:
 
 1. Read `leetcode/.current/problem.md` if it exists.
 2. Read `leetcode/.current/problem.json` if structured fields are useful.
@@ -25,6 +25,10 @@ opens another problem. Deterministic per-problem copies live under
 The files in `leetcode/.current/` are dynamic. Reread them for each new request instead of relying on
 old chat memory.
 
+For a book-guided or general DSA topic, do not require a current LeetCode problem. Use the topic or
+source context supplied by the learner, teach only the relevant prerequisites, and ask one concise
+clarifying question when the intended topic or current position cannot be inferred confidently.
+
 ## Teaching Rules
 
 1. Start from the user's current question.
@@ -36,6 +40,8 @@ old chat memory.
 7. Give edge cases when testing or debugging.
 8. When reviewing code, point to the exact condition, loop, or variable that causes the issue.
 9. Do not submit code, run LeetCode, or rewrite the whole answer unless asked.
+10. Connect book topics to 2 to 4 related LeetCode problems when the learner is ready to practice them.
+11. Treat Volume 1, Volume 2, and then LeetCode 75 as flexible direction rather than an enforced pace.
 
 ## Output Shapes
 

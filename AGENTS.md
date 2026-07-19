@@ -2,19 +2,29 @@
 
 Read this file before every task. Working code only. Finish the job. Plausibility is not correctness.
 
-This repo is a terminal-first LeetCode practice workspace. The normal workflow is tmux plus
-LeetCode CLI plus Neovim plus an OpenCode tutor window.
+This repo owns the learner's Python DSA and LeetCode route. The normal workflow is guided study plus
+related LeetCode practice using tmux, LeetCode CLI, Neovim, and an OpenCode tutor window.
+
+## Learning Route
+
+1. Complete A Common-Sense Guide to Data Structures and Algorithms in Python, Volume 1.
+2. Continue immediately with Volume 2.
+3. For each topic, implement it in Python, complete the exercises, and solve 2 to 4 related LeetCode problems.
+4. Complete LeetCode 75 after Volume 2.
+5. Keep C, Linux, and security work in `../c_linux_kernel_systems_programming`.
+6. Keep machine learning, AI, LLM, and reasoning-model work in `../ml_engineering`.
 
 ## Repo-Specific Rules
 
-1. For any request that sounds like "explain", "teach", "hint", "walk me through", "debug my approach", "why does this fail", or "help with this problem", use `.skills/leetcode-dsa-teach/SKILL.md`.
-2. Before answering those requests, read the latest files under `leetcode/.current/`. At minimum read `leetcode/.current/problem.md` when it exists. If code context is needed, read the path stored in `leetcode/.current/path`.
-3. Treat `leetcode/.current/problem.md` and `leetcode/.current/problem.json` as the current open problem context. They can change while the OpenCode session stays open, so reread them for each new teaching/help request.
-4. Do not assume the file in `leetcode/.current/path` belongs to the current problem unless it matches the current problem id or slug. If it looks stale, say so.
-5. Do not give a full solution immediately unless the user explicitly asks for one. Prefer hints, invariants, examples, dry runs, edge cases, and complexity reasoning first.
-6. Do not submit solutions or run LeetCode commands unless the user explicitly asks.
-7. Generated solution files under `leetcode/` are personal practice artifacts and are intentionally git-ignored. Do not commit them.
-8. Keep output terminal-native. No HTML lessons, browser-only instructions, or visual artifacts for the DSA tutor flow.
+1. For any DSA, algorithms, LeetCode, explanation, teaching, hint, walkthrough, approach review, or solution-debugging request, use `.skills/leetcode-dsa-teach/SKILL.md`.
+2. For a LeetCode-specific request, read the latest files under `leetcode/.current/`. At minimum read `leetcode/.current/problem.md` when it exists. If code context is needed, read the path stored in `leetcode/.current/path`.
+3. For a book-guided or general DSA topic, use the supplied topic context without requiring a current LeetCode problem.
+4. Treat `leetcode/.current/problem.md` and `leetcode/.current/problem.json` as the current open problem context. They can change while the OpenCode session stays open, so reread them for each new LeetCode teaching/help request.
+5. Do not assume the file in `leetcode/.current/path` belongs to the current problem unless it matches the current problem id or slug. If it looks stale, say so.
+6. Do not give a full solution immediately unless the user explicitly asks for one. Prefer hints, invariants, examples, dry runs, edge cases, and complexity reasoning first.
+7. Do not submit solutions or run LeetCode commands unless the user explicitly asks.
+8. Generated solution files under `leetcode/` are personal practice artifacts and are intentionally git-ignored. Do not commit them.
+9. Keep output terminal-native. No HTML lessons, browser-only instructions, or visual artifacts for the DSA tutor flow.
 
 ## Current-Problem Files
 
